@@ -27,24 +27,24 @@
 
 ## Backend
 
-* [ ] Revisar estructura del backend
-* [ ] Detectar código duplicado
-* [ ] Detectar rutas innecesarias
-* [ ] Revisar middlewares
-* [ ] Revisar validaciones
-* [ ] Revisar manejo de errores
-* [ ] Revisar seguridad básica
-* [ ] Revisar queries PostgreSQL
-* [ ] Revisar performance general
-* [ ] Revisar variables de entorno
-* [ ] Limpiar código no utilizado
-* [ ] Revisar manejo de sesiones
-* [ ] Revisar flujo de pedidos
-* [ ] Revisar lógica de caja
-* [ ] Revisar lógica de cocina
-* [ ] Revisar manejo de estado tiempo real
-* [ ] Revisar estabilidad websocket/socket.io
-* [ ] Crear documentación técnica backend
+* [x] Revisar estructura del backend — un solo archivo limpio, sin duplicados
+* [x] Detectar código duplicado — ninguno
+* [x] Detectar rutas innecesarias — ninguna
+* [x] Revisar middlewares — cors, json, static OK
+* [x] Revisar validaciones — agregadas en rutas críticas (pedidos, cobrar, pago)
+* [x] Revisar manejo de errores — try/catch en todas las rutas
+* [x] Revisar seguridad básica — PUT /pedidos/:id restringido a solo estado
+* [x] Revisar queries PostgreSQL — transacciones en pedidos, cobrar, cancelar, pagos
+* [x] Revisar performance general — índices FK agregados, queries OK para escala actual
+* [x] Revisar variables de entorno — en .env y systemd service, OK
+* [x] Limpiar código no utilizado — dependencias no usadas eliminadas
+* [x] Revisar manejo de sesiones — PIN login, aceptable para LAN cerrada
+* [x] Revisar flujo de pedidos — transacción atómica pedido+stock, guard doble cancelación
+* [x] Revisar lógica de caja — cierre de caja OK
+* [x] Revisar lógica de cocina — cambiar-estado via WebSocket OK
+* [x] Revisar manejo de estado tiempo real — socket.io emite en todas las mutaciones
+* [x] Revisar estabilidad websocket/socket.io — configuración OK
+* [x] Crear documentación técnica backend — ver ARCHITECTURE.md
 
 ## Frontend / UX
 

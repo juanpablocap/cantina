@@ -142,8 +142,10 @@ app.post('/api/system/backup', async (req, res) => {
 // USUARIOS
 // ============================================
 app.get('/api/usuarios', async (req, res) => {
-  const users = await prisma.usuario.findMany({ where: { activo: true } });
-  res.json(users);
+  try {
+    const users = await prisma.usuario.findMany({ where: { activo: true } });
+    res.json(users);
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 app.post('/api/usuarios', async (req, res) => {
   try {
@@ -152,33 +154,43 @@ app.post('/api/usuarios', async (req, res) => {
   } catch(e) { res.status(400).json({ error: e.message }); }
 });
 app.put('/api/usuarios/:id', async (req, res) => {
-  const user = await prisma.usuario.update({ where: { id: Number(req.params.id) }, data: req.body });
-  res.json(user);
+  try {
+    const user = await prisma.usuario.update({ where: { id: Number(req.params.id) }, data: req.body });
+    res.json(user);
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 app.delete('/api/usuarios/:id', async (req, res) => {
-  await prisma.usuario.update({ where: { id: Number(req.params.id) }, data: { activo: false } });
-  res.json({ deleted: true });
+  try {
+    await prisma.usuario.update({ where: { id: Number(req.params.id) }, data: { activo: false } });
+    res.json({ deleted: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 app.post('/api/login', async (req, res) => {
-  const user = await prisma.usuario.findUnique({ where: { pin: req.body.pin } });
-  if (user && user.activo) res.json(user);
-  else res.status(401).json({ error: 'PIN incorrecto' });
+  try {
+    const user = await prisma.usuario.findUnique({ where: { pin: req.body.pin } });
+    if (user && user.activo) res.json(user);
+    else res.status(401).json({ error: 'PIN incorrecto' });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // ============================================
 // CATEGORIAS
 // ============================================
 app.get('/api/categorias', async (req, res) => {
-  const cats = await prisma.categoria.findMany({ orderBy: { orden: 'asc' } });
-  res.json(cats);
+  try {
+    const cats = await prisma.categoria.findMany({ orderBy: { orden: 'asc' } });
+    res.json(cats);
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // ============================================
 // PRODUCTOS
 // ============================================
 app.get('/api/productos', async (req, res) => {
-  const prods = await prisma.producto.findMany({ where: { activo: true }, include: { categoria: true } });
-  res.json(prods);
+  try {
+    const prods = await prisma.producto.findMany({ where: { activo: true }, include: { categoria: true } });
+    res.json(prods);
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 app.post('/api/productos', async (req, res) => {
   try {
@@ -187,21 +199,27 @@ app.post('/api/productos', async (req, res) => {
   } catch(e) { res.status(400).json({ error: e.message }); }
 });
 app.put('/api/productos/:id', async (req, res) => {
-  const prod = await prisma.producto.update({ where: { id: Number(req.params.id) }, data: req.body, include: { categoria: true } });
-  res.json(prod);
+  try {
+    const prod = await prisma.producto.update({ where: { id: Number(req.params.id) }, data: req.body, include: { categoria: true } });
+    res.json(prod);
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 app.get('/api/productos/barcode/:code', async (req, res) => {
-  const prod = await prisma.producto.findUnique({ where: { codigo: req.params.code }, include: { categoria: true } });
-  if (prod) res.json(prod);
-  else res.status(404).json({ error: 'No encontrado' });
+  try {
+    const prod = await prisma.producto.findUnique({ where: { codigo: req.params.code }, include: { categoria: true } });
+    if (prod) res.json(prod);
+    else res.status(404).json({ error: 'No encontrado' });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // ============================================
 // CLIENTES
 // ============================================
 app.get('/api/clientes', async (req, res) => {
-  const clients = await prisma.cliente.findMany({ where: { activo: true }, include: { pagos: { orderBy: { fecha: 'desc' }, take: 20 } } });
-  res.json(clients);
+  try {
+    const clients = await prisma.cliente.findMany({ where: { activo: true }, include: { pagos: { orderBy: { fecha: 'desc' }, take: 20 } } });
+    res.json(clients);
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 app.post('/api/clientes', async (req, res) => {
   try {
@@ -210,75 +228,86 @@ app.post('/api/clientes', async (req, res) => {
   } catch(e) { res.status(400).json({ error: e.message }); }
 });
 app.put('/api/clientes/:id', async (req, res) => {
-  const client = await prisma.cliente.update({ where: { id: Number(req.params.id) }, data: req.body });
-  res.json(client);
+  try {
+    const client = await prisma.cliente.update({ where: { id: Number(req.params.id) }, data: req.body });
+    res.json(client);
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 app.post('/api/clientes/:id/pago', async (req, res) => {
-  const { monto } = req.body;
-  const cliente = await prisma.cliente.findUnique({ where: { id: Number(req.params.id) } });
-  if (!cliente) return res.status(404).json({ error: 'Cliente no encontrado' });
-  await prisma.clientePago.create({ data: { cliente_id: cliente.id, monto } });
-  const updated = await prisma.cliente.update({ where: { id: cliente.id }, data: { saldo: Math.max(0, cliente.saldo - monto) } });
-  res.json(updated);
+  try {
+    const { monto } = req.body;
+    if (!monto || monto <= 0) return res.status(400).json({ error: 'monto debe ser mayor a 0' });
+    const updated = await prisma.$transaction(async (tx) => {
+      const cliente = await tx.cliente.findUnique({ where: { id: Number(req.params.id) } });
+      if (!cliente) throw Object.assign(new Error('Cliente no encontrado'), { status: 404 });
+      await tx.clientePago.create({ data: { cliente_id: cliente.id, monto } });
+      return tx.cliente.update({ where: { id: cliente.id }, data: { saldo: Math.max(0, cliente.saldo - monto) } });
+    });
+    res.json(updated);
+  } catch(e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
 });
 
 // ============================================
 // PEDIDOS
 // ============================================
 app.get('/api/pedidos', async (req, res) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const pedidos = await prisma.pedido.findMany({
-    where: { createdAt: { gte: today } },
-    include: { items: { include: { producto: true } }, cliente: true },
-    orderBy: { createdAt: 'desc' }
-  });
-  res.json(pedidos);
+  try {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const pedidos = await prisma.pedido.findMany({
+      where: { createdAt: { gte: today } },
+      include: { items: { include: { producto: true } }, cliente: true },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(pedidos);
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/pedidos/all', async (req, res) => {
-  const pedidos = await prisma.pedido.findMany({
-    include: { items: { include: { producto: true } }, cliente: true },
-    orderBy: { createdAt: 'desc' },
-    take: 200,
-  });
-  res.json(pedidos);
+  try {
+    const pedidos = await prisma.pedido.findMany({
+      include: { items: { include: { producto: true } }, cliente: true },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+    res.json(pedidos);
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/pedidos', async (req, res) => {
   try {
     const { tipo, mesa_numero, nombre_cliente, total, items } = req.body;
-    // Get next number for today
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const lastPedido = await prisma.pedido.findFirst({ where: { createdAt: { gte: today } }, orderBy: { numero: 'desc' } });
-    const numero = (lastPedido?.numero || 0) + 1;
+    if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'items requeridos' });
+    if (!['mesa', 'barra'].includes(tipo)) return res.status(400).json({ error: 'tipo inválido' });
+    if (!total || total <= 0) return res.status(400).json({ error: 'total inválido' });
 
-    const pedido = await prisma.pedido.create({
-      data: {
-        numero, tipo,
-        mesa_numero: mesa_numero || null,
-        nombre_cliente: nombre_cliente || null,
-        total,
-        items: {
-          create: items.map(i => ({
-            producto_id: i.producto_id,
-            cantidad: i.cantidad,
-            precio: i.precio,
-            observaciones: i.observaciones || null,
-          }))
-        }
-      },
-      include: { items: { include: { producto: true } } }
-    });
-
-    // Descontar stock
-    for (const item of items) {
-      await prisma.producto.update({
-        where: { id: item.producto_id },
-        data: { stock: { decrement: item.cantidad } }
+    const pedido = await prisma.$transaction(async (tx) => {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const lastPedido = await tx.pedido.findFirst({ where: { createdAt: { gte: today } }, orderBy: { numero: 'desc' } });
+      const numero = (lastPedido?.numero || 0) + 1;
+      const pedido = await tx.pedido.create({
+        data: {
+          numero, tipo,
+          mesa_numero: mesa_numero || null,
+          nombre_cliente: nombre_cliente || null,
+          total,
+          items: {
+            create: items.map(i => ({
+              producto_id: i.producto_id,
+              cantidad: i.cantidad,
+              precio: i.precio,
+              observaciones: i.observaciones || null,
+            }))
+          }
+        },
+        include: { items: { include: { producto: true } } }
       });
-    }
+      for (const item of items) {
+        await tx.producto.update({ where: { id: item.producto_id }, data: { stock: { decrement: item.cantidad } } });
+      }
+      return pedido;
+    });
 
     io.emit('nuevo-pedido', pedido);
     res.json(pedido);
@@ -290,9 +319,11 @@ app.post('/api/pedidos', async (req, res) => {
 
 app.put('/api/pedidos/:id', async (req, res) => {
   try {
+    const { estado } = req.body;
+    if (!estado) return res.status(400).json({ error: 'estado requerido' });
     const pedido = await prisma.pedido.update({
       where: { id: Number(req.params.id) },
-      data: req.body,
+      data: { estado },
       include: { items: { include: { producto: true } } }
     });
     io.emit('pedido-actualizado', pedido);
@@ -304,55 +335,54 @@ app.put('/api/pedidos/:id', async (req, res) => {
 
 app.post('/api/pedidos/:id/cobrar', async (req, res) => {
   const { metodo_pago, referencia, descuento_pct, cliente_id } = req.body;
-  const data = { cobrado: true, metodo_pago, estado: 'entregado' };
-  if (referencia) data.referencia = referencia;
-  if (descuento_pct) data.descuento_pct = descuento_pct;
-  if (cliente_id) data.cliente_id = cliente_id;
+  const metodosValidos = ['efectivo', 'transferencia', 'cuenta_corriente'];
+  if (!metodosValidos.includes(metodo_pago)) return res.status(400).json({ error: 'metodo_pago inválido' });
 
   try {
-    const pedido = await prisma.pedido.update({
-      where: { id: Number(req.params.id) },
-      data,
-      include: { items: { include: { producto: true } } }
-    });
-    if (metodo_pago === 'cuenta_corriente' && cliente_id) {
-      await prisma.cliente.update({
-        where: { id: cliente_id },
-        data: { saldo: { increment: pedido.total } }
+    const pedido = await prisma.$transaction(async (tx) => {
+      const existing = await tx.pedido.findUnique({ where: { id: Number(req.params.id) } });
+      if (!existing) throw Object.assign(new Error('Pedido no encontrado'), { status: 404 });
+      if (existing.cobrado) throw Object.assign(new Error('Pedido ya cobrado'), { status: 409 });
+
+      const data = { cobrado: true, metodo_pago, estado: 'entregado' };
+      if (referencia) data.referencia = referencia;
+      if (descuento_pct) data.descuento_pct = descuento_pct;
+      if (cliente_id) data.cliente_id = cliente_id;
+
+      const pedido = await tx.pedido.update({
+        where: { id: Number(req.params.id) },
+        data,
+        include: { items: { include: { producto: true } } }
       });
-    }
+      if (metodo_pago === 'cuenta_corriente' && cliente_id) {
+        await tx.cliente.update({ where: { id: cliente_id }, data: { saldo: { increment: pedido.total } } });
+      }
+      return pedido;
+    });
     io.emit('pedido-actualizado', pedido);
     res.json(pedido);
   } catch(e) {
     console.error('Cobro error:', e);
-    res.status(500).json({ error: e.message });
+    res.status(e.status || 500).json({ error: e.message });
   }
 });
 
 app.post('/api/pedidos/:id/cancelar', async (req, res) => {
   try {
-    const pedido = await prisma.pedido.findUnique({
-      where: { id: Number(req.params.id) },
-      include: { items: true }
-    });
-    if (!pedido) return res.status(404).json({ error: 'No encontrado' });
+    const updated = await prisma.$transaction(async (tx) => {
+      const pedido = await tx.pedido.findUnique({ where: { id: Number(req.params.id) }, include: { items: true } });
+      if (!pedido) throw Object.assign(new Error('Pedido no encontrado'), { status: 404 });
+      if (pedido.estado === 'cancelado') throw Object.assign(new Error('Pedido ya cancelado'), { status: 409 });
 
-    // Restore stock
-    for (const item of pedido.items) {
-      await prisma.producto.update({
-        where: { id: item.producto_id },
-        data: { stock: { increment: item.cantidad } }
-      });
-    }
-
-    const updated = await prisma.pedido.update({
-      where: { id: Number(req.params.id) },
-      data: { estado: 'cancelado' }
+      for (const item of pedido.items) {
+        await tx.producto.update({ where: { id: item.producto_id }, data: { stock: { increment: item.cantidad } } });
+      }
+      return tx.pedido.update({ where: { id: Number(req.params.id) }, data: { estado: 'cancelado' } });
     });
     io.emit('pedido-actualizado', updated);
     res.json(updated);
   } catch(e) {
-    res.status(500).json({ error: e.message });
+    res.status(e.status || 500).json({ error: e.message });
   }
 });
 
@@ -366,8 +396,10 @@ app.post('/api/cierres', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 app.get('/api/cierres', async (req, res) => {
-  const cierres = await prisma.cierreCaja.findMany({ orderBy: { fecha: 'desc' }, take: 30 });
-  res.json(cierres);
+  try {
+    const cierres = await prisma.cierreCaja.findMany({ orderBy: { fecha: 'desc' }, take: 30 });
+    res.json(cierres);
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // ============================================
@@ -394,8 +426,10 @@ app.delete('/api/autoservicio/:id', (req, res) => {
 // CAROUSEL IMAGES
 // ============================================
 app.get('/api/carousel', async (req, res) => {
-  const imgs = await prisma.carouselImage.findMany({ where: { activo: true }, orderBy: { orden: 'asc' } });
-  res.json(imgs);
+  try {
+    const imgs = await prisma.carouselImage.findMany({ where: { activo: true }, orderBy: { orden: 'asc' } });
+    res.json(imgs);
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // ============================================
