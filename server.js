@@ -102,7 +102,7 @@ app.post('/api/system/restart/:service', (req, res) => {
   const allowed = { 'cantina-api': true, 'postgresql': true };
   if (!allowed[req.params.service]) return res.status(400).json({ error: 'Not allowed' });
   try {
-    exec(`sudo systemctl restart ${req.params.service}`, (err) => {
+    exec(`sudo -n systemctl restart ${req.params.service}`, (err) => {
       res.json({ restarted: true, service: req.params.service, error: err?.message || null });
     });
   } catch(e) {
@@ -113,7 +113,7 @@ app.post('/api/system/restart/:service', (req, res) => {
 // Clear RAM cache
 app.post('/api/system/clear-cache', (req, res) => {
   try {
-    execSync('sync; echo 3 | sudo tee /proc/sys/vm/drop_caches', { timeout: 5000 });
+    execSync('sync; echo 3 | sudo -n tee /proc/sys/vm/drop_caches', { timeout: 5000 });
     res.json({ cleared: true });
   } catch(e) {
     res.json({ cleared: false, error: e.message });

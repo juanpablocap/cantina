@@ -10,10 +10,10 @@
 * [x] Confirmar autorestart de nginx — Restart=always (override en /etc/systemd/system/nginx.service.d/)
 * [x] Confirmar autorestart postgresql — Restart=on-failure (override en /etc/systemd/system/postgresql@18-main.service.d/)
 * [ ] Confirmar autorestart kiosk/chromium
-* [ ] Revisar manejo de errores críticos
-* [ ] Revisar logs del sistema
-* [ ] Revisar logs backend
-* [ ] Revisar logs nginx
+* [x] Revisar manejo de errores críticos — fix sudo -n en restart y clear-cache
+* [x] Revisar logs del sistema — sin errores críticos
+* [x] Revisar logs backend — fix sudo sin flag -n causaba auth failures silenciosos
+* [x] Revisar logs nginx — limpio
 * [ ] Revisar manejo de errores PostgreSQL
 * [x] Crear script restart_backend.sh
 * [x] Crear script restart_all.sh
