@@ -1,0 +1,111 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id    Int    @id @default(autoincrement())
+  nombre String
+  rol    String
+  pin    String @unique
+  activo Boolean @default(true)
+  createdAt DateTime @default(now())
+}
+
+model Categoria {
+  id              Int       @id @default(autoincrement())
+  nombre          String
+  emoji           String?
+  color           String?
+  despacho_directo Boolean  @default(false)
+  orden           Int       @default(0)
+  productos       Producto[]
+}
+
+model Producto {
+  id         Int       @id @default(autoincrement())
+  nombre     String
+  precio     Float
+  stock      Int       @default(0)
+  stock_min  Int       @default(5)
+  codigo     String?   @unique
+  cocina     Boolean   @default(true)
+  activo     Boolean   @default(true)
+  cat_id     Int
+  categoria  Categoria @relation(fields: [cat_id], references: [id])
+  items      PedidoItem[]
+}
+
+model Cliente {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  apellido  String?
+  apodo     String?
+  division  String?
+  whatsapp  String?
+  saldo     Float    @default(0)
+  activo    Boolean  @default(true)
+  pedidos   Pedido[]
+  pagos     ClientePago[]
+}
+
+model ClientePago {
+  id         Int      @id @default(autoincrement())
+  cliente_id Int
+  cliente    Cliente  @relation(fields: [cliente_id], references: [id])
+  monto      Float
+  fecha      DateTime @default(now())
+}
+
+model Pedido {
+  id              Int          @id @default(autoincrement())
+  numero          Int
+  tipo            String
+  mesa_numero     Int?
+  nombre_cliente  String?
+  estado          String       @default("pendiente")
+  cobrado         Boolean      @default(false)
+  total           Float
+  metodo_pago     String?
+  referencia      String?
+  descuento_pct   Float?
+  cliente_id      Int?
+  cliente         Cliente?     @relation(fields: [cliente_id], references: [id])
+  items           PedidoItem[]
+  createdAt       DateTime     @default(now())
+}
+
+model PedidoItem {
+  id            Int      @id @default(autoincrement())
+  pedido_id     Int
+  pedido        Pedido   @relation(fields: [pedido_id], references: [id])
+  producto_id   Int
+  producto      Producto @relation(fields: [producto_id], references: [id])
+  cantidad      Int
+  precio        Float
+  observaciones String?
+}
+
+model CierreCaja {
+  id            Int      @id @default(autoincrement())
+  efectivo      Float
+  transferencia Float
+  fiado         Float
+  totalVentas   Float
+  cantPedidos   Int
+  arqueo        Float?
+  diferencia    Float?
+  fecha         DateTime @default(now())
+}
+
+model CarouselImage {
+  id       Int      @id @default(autoincrement())
+  filename String
+  orden    Int      @default(0)
+  activo   Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
