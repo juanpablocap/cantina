@@ -20,10 +20,10 @@
 * [x] Crear script backup.sh
 * [x] Crear script restore.sh
 * [x] Crear script healthcheck.sh
-* [ ] Verificar recuperación tras reinicio del servidor
+* [x] Verificar recuperación tras reinicio del servidor — todos los servicios levantan solos
 * [x] Verificar funcionamiento offline/LAN — CDN y fuentes movidos a local
 * [ ] Revisar manejo de pérdida de red local
-* [ ] Verificar arranque automático completo tras reboot
+* [x] Verificar arranque automático completo tras reboot — orden correcto: postgresql → cantina-api → nginx (fix 502 aplicado)
 
 ## Backend
 
