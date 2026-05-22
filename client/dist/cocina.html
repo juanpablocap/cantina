@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Cantina POS — Cocina</title>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{margin:0;background:#0A0D14;color:#F0F2F5;overflow:hidden;height:100vh}#root{height:100vh;color:#F0F2F5}input:focus,select:focus{outline:none}::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#1E2230;border-radius:3px}</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="/vendor/react.production.min.js"></script>
+<script src="/vendor/react-dom.production.min.js"></script>
+<script src="/vendor/babel.min.js"></script>
+<script type="text/babel" data-presets="react">
+const {useState, useEffect, useCallback} = React;
+
+const API = window.location.origin + '/api';
+const apiFetch = async (path, opts = {}) => {
+  try {
+    const res = await fetch(API + path, { headers: { 'Content-Type': 'application/json' }, ...opts, body: opts.body ? JSON.stringify(opts.body) : undefined });
+    if (!res.ok) throw new Error(res.statusText);
+    return await res.json();
+  } catch (e) { console.error('API:', e); return null; }
+};
+
+const itemNombre = (i) => i.nombre || (i.producto && i.producto.nombre) || "?";
+
+const S = { bg: "#0A0D14", surface: "#12151C", border: "#1E2230", text: "#F0F2F5", muted: "#ffffff30", danger: "#FF4444", warning: "#FFB833", success: "#5BF5A0", info: "#6C9BCF" };
+
+function Timer({ desde }) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const start = new Date(desde).getTime();
+    const tick = () => setElapsed(Math.floor((Date.now() - start) / 1000));
+    tick();
+    const iv = setInterval(tick, 1000);
+    return () => clearInterval(iv);
+  }, [desde]);
+  const m = Math.floor(elapsed / 60), s = elapsed % 60;
+  const color = m >= 12 ? S.danger : m >= 6 ? S.warning : S.success;
+  return (
+    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 42, fontWeight: 900, color, textShadow: `0 0 15px ${color}40`, animation: m >= 12 ? "blink 1s infinite" : "none" }}>
+      {m}:{String(s).padStart(2, "0")}
+    </span>
+  );
+}
+
+window.__App = function CocinaDisplay() {
+  const [pedidos, setPedidos] = useState([]);
+  const [now, setNow] = useState(new Date());
+
+  // Load pedidos from API
+  const loadPedidos = useCallback(async () => {
+    const peds = await apiFetch('/pedidos');
+    if (peds) {
+      const activos = peds.filter(p => ["pendiente", "en_preparacion", "listo"].includes(p.estado));
+      setPedidos(activos);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPedidos();
+    const iv = setInterval(loadPedidos, 5000); // Poll every 5s
+    const clock = setInterval(() => setNow(new Date()), 1000);
+    return () => { clearInterval(iv); clearInterval(clock); };
+  }, [loadPedidos]);
+
+  // Sounds
+  const playAlarm = useCallback(() => {
+    try {
+      const c = new AudioContext();
+      const b = (f, t, d) => { const o = c.createOscillator(); const g = c.createGain(); o.connect(g); g.connect(c.destination); o.frequency.value = f; o.type = "square"; g.gain.value = 0.5; o.start(c.currentTime + t); o.stop(c.currentTime + t + d); };
+      b(800, 0, .15); b(1000, .2, .15); b(1200, .4, .3);
+      b(800, .85, .15); b(1000, 1.05, .15); b(1200, 1.25, .3);
+      b(800, 1.7, .15); b(1000, 1.9, .15); b(1200, 2.1, .4);
+      setTimeout(() => c.close(), 3000);
+    } catch (e) {}
+  }, []);
+
+  const playBell = useCallback(() => {
+    try {
+      const c = new AudioContext();
+      const p = (f, t, d) => { const o = c.createOscillator(); const g = c.createGain(); o.connect(g); g.connect(c.destination); o.frequency.value = f; o.type = "sine"; g.gain.setValueAtTime(0.6, c.currentTime + t); g.gain.exponentialRampToValueAtTime(0.01, c.currentTime + t + d); o.start(c.currentTime + t); o.stop(c.currentTime + t + d); };
+      p(1318, 0, .5); p(1046, .35, .5); p(1318, .7, .5); p(1568, 1.05, .8);
+      setTimeout(() => c.close(), 2500);
+    } catch (e) {}
+  }, []);
+
+  const cambiarEstado = useCallback(async (id, nuevoEstado) => {
+    await apiFetch(`/pedidos/${id}`, { method: 'PUT', body: { estado: nuevoEstado } });
+    if (nuevoEstado === "listo") {
+      playBell();
+      setPedidos(prev => prev.map(p => p.id === id ? { ...p, estado: "listo" } : p));
+      setTimeout(() => setPedidos(prev => prev.filter(p => p.id !== id)), 5000);
+    } else if (nuevoEstado === "entregado") {
+      setPedidos(prev => prev.filter(p => p.id !== id));
+    } else {
+      setPedidos(prev => prev.map(p => p.id === id ? { ...p, estado: nuevoEstado } : p));
+    }
+  }, [playBell]);
+
+  const sorted = [...pedidos].sort((a, b) => {
+    const o = { pendiente: 0, en_preparacion: 1, listo: 2 };
+    return (o[a.estado] ?? 3) - (o[b.estado] ?? 3) || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  });
+
+  return (
+    <div style={{ height: "100vh", background: S.bg, fontFamily: "'DM Sans', -apple-system, sans-serif", color: S.text, display: "flex", flexDirection: "column" }}>
+      <style>{`
+        @import url('/fonts/dm-jb.css');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { margin: 0; overflow: hidden; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        @keyframes pulseCard { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,68,68,0); } 50% { box-shadow: 0 0 30px rgba(255,68,68,0.3); } }
+      `}</style>
+
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 28px", background: S.surface, borderBottom: `3px solid ${S.border}`, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 32 }}>👨‍🍳</span>
+          <span style={{ fontSize: 28, fontWeight: 900, letterSpacing: "0.06em" }}>COCINA</span>
+          <div style={{ width: 10, height: 10, borderRadius: "50%", background: S.success, boxShadow: `0 0 8px ${S.success}`, marginLeft: 4 }} />
+        </div>
+        <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+          {pedidos.filter(p => p.estado === "pendiente").length > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", borderRadius: 10, background: S.danger + "20", border: `2px solid ${S.danger}50` }}>
+              <span style={{ fontSize: 20, fontWeight: 900, color: S.danger }}>{pedidos.filter(p => p.estado === "pendiente").length} NUEVOS</span>
+            </div>
+          )}
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 26, fontWeight: 800, color: "#ffffff60" }}>
+            {now.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
+          </div>
+        </div>
+      </div>
+
+      {/* Orders */}
+      <div style={{ flex: 1, overflow: "auto", padding: 18 }}>
+        {sorted.length === 0 ? (
+          <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: S.muted }}>
+            <span style={{ fontSize: 80 }}>👨‍🍳</span>
+            <span style={{ fontSize: 28, fontWeight: 800, marginTop: 12 }}>Sin pedidos activos</span>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: sorted.length <= 2 ? "repeat(2, 1fr)" : "repeat(3, 1fr)", gap: 18, alignItems: "start" }}>
+            {sorted.map(p => {
+              const isPend = p.estado === "pendiente", isPrep = p.estado === "en_preparacion", isListo = p.estado === "listo";
+              const brd = isPend ? S.danger : isPrep ? S.warning : S.success;
+              const itemsC = (p.items || []).filter(i => !(i.despacho_directo));
+              const itemsD = (p.items || []).filter(i => i.despacho_directo);
+
+              return (
+                <div key={p.id} style={{ borderRadius: 18, overflow: "hidden", background: S.surface, border: `4px solid ${brd}`, boxShadow: isPend ? `0 0 30px ${brd}30` : `0 4px 20px rgba(0,0,0,0.3)`, animation: isPend ? "pulseCard 2s infinite" : "none" }}>
+                  {/* Header */}
+                  <div style={{ padding: "14px 22px", display: "flex", justifyContent: "space-between", alignItems: "center", background: brd + "20", borderBottom: `3px solid ${brd}40` }}>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
+                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 48, fontWeight: 900 }}>#{String(p.numero).padStart(2, "0")}</span>
+                      <span style={{ fontSize: 20, fontWeight: 800, color: brd }}>
+                        {p.tipo === "mesa" ? "MESA " + p.mesa_numero : p.tipo === "barra" ? "BARRA" : "🛍️ LLEVAR"}
+                      </span>
+                    </div>
+                    <Timer desde={p.createdAt} />
+                  </div>
+
+                  {/* Items */}
+                  <div style={{ padding: "10px 18px" }}>
+                    {itemsC.map((it, idx) => (
+                      <div key={idx} style={{ padding: "8px 0", borderBottom: idx < itemsC.length - 1 ? "1px solid #ffffff10" : "none", display: "flex", alignItems: "flex-start", gap: 12 }}>
+                        <div style={{ minWidth: 44, height: 44, borderRadius: 10, background: brd, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'JetBrains Mono', monospace", fontSize: 24, fontWeight: 900, color: "#000" }}>{it.cantidad}</div>
+                        <div>
+                          <div style={{ fontSize: 24, fontWeight: 800, lineHeight: 1.2 }}>{itemNombre(it)}</div>
+                          {it.observaciones && <div style={{ marginTop: 4, fontSize: 18, fontWeight: 700, color: "#FF6B6B" }}>⚠️ {it.observaciones}</div>}
+                        </div>
+                      </div>
+                    ))}
+                    {itemsD.length > 0 && (
+                      <div style={{ marginTop: 6, padding: "6px 10px", borderRadius: 8, background: S.success + "10", border: `1px solid ${S.success}30`, fontSize: 14, fontWeight: 700, color: S.success }}>
+                        🍺 +{itemsD.reduce((s, i) => s + i.cantidad, 0)} bebida(s) en mostrador
+                      </div>
+                    )}
+                    {p.nombre_cliente && (
+                      <div style={{ marginTop: 6, fontSize: 16, fontWeight: 700, color: S.info }}>📢 {p.nombre_cliente}</div>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ padding: "10px 18px 14px" }}>
+                    {isPend && (
+                      <button onClick={() => cambiarEstado(p.id, "en_preparacion")} style={{ width: "100%", padding: "16px 0", borderRadius: 12, border: "none", background: `linear-gradient(135deg, ${S.warning}, #FF9500)`, color: "#000", fontSize: 22, fontWeight: 900, cursor: "pointer" }}>
+                        🔥 EMPEZAR A PREPARAR
+                      </button>
+                    )}
+                    {isPrep && (
+                      <button onClick={() => cambiarEstado(p.id, "listo")} style={{ width: "100%", padding: "16px 0", borderRadius: 12, border: "none", background: `linear-gradient(135deg, ${S.success}, #2DD47A)`, color: "#000", fontSize: 22, fontWeight: 900, cursor: "pointer" }}>
+                        ✅ LISTO PARA ENTREGAR
+                      </button>
+                    )}
+                    {isListo && (
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <div style={{ flex: 1, padding: "16px 0", borderRadius: 12, background: S.success + "20", color: S.success, fontSize: 18, fontWeight: 900, textAlign: "center" }}>✅ ESPERANDO RETIRO</div>
+                        <button onClick={() => cambiarEstado(p.id, "entregado")} style={{ padding: "16px 18px", borderRadius: 12, border: "none", background: S.info, color: "#fff", fontSize: 16, fontWeight: 900, cursor: "pointer" }}>📦 ENTREGADO</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(window.__App));
+</script>
+</body>
+</html>

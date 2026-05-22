@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Cantina POS — Autoservicio</title>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{margin:0;background:#FAFAF7;color:#1A1A1A;overflow:hidden;height:100vh}#root{height:100vh;color:#1A1A1A}input:focus,select:focus{outline:none}::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#1E2230;border-radius:3px}</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="/vendor/react.production.min.js"></script>
+<script src="/vendor/react-dom.production.min.js"></script>
+<script src="/vendor/babel.min.js"></script>
+<script type="text/babel" data-presets="react">
+const {useState, useEffect, useRef} = React;
+
+const API = window.location.origin + '/api';
+const apiFetch = async (path, opts = {}) => {
+  try {
+    const res = await fetch(API + path, { headers: { 'Content-Type': 'application/json' }, ...opts, body: opts.body ? JSON.stringify(opts.body) : undefined });
+    if (!res.ok) throw new Error(res.statusText);
+    return await res.json();
+  } catch (e) { console.error('API:', e); return null; }
+};
+
+// Color/icon mapping for categories
+const CAT_STYLES = {
+  "Platos": { emoji: "🍽️", color: "#E07A5F", bg: "linear-gradient(135deg, #E07A5F, #c94b4b)", desc: "Milanesas, hamburguesas, lomos y más" },
+  "Bebidas": { emoji: "🍺", color: "#6C9BCF", bg: "linear-gradient(135deg, #6C9BCF, #2F80ED)", desc: "Gaseosas, cervezas, agua y tragos" },
+  "Cafetería": { emoji: "☕", color: "#C4956A", bg: "linear-gradient(135deg, #C4956A, #6D4C41)", desc: "Café, cortado, submarino" },
+  "Postres": { emoji: "🍰", color: "#D4A5D0", bg: "linear-gradient(135deg, #D4A5D0, #9B59B6)", desc: "Flan, brownie y dulces" },
+};
+const DEFAULT_STYLE = { emoji: "📦", color: "#6B7080", bg: "linear-gradient(135deg, #6B7080, #444)", desc: "Otros productos" };
+
+// Product icon mapping
+const PROD_ICONS = {
+  "milanesa": { icon: "🥩", bg: "linear-gradient(135deg, #f5af19, #f12711)" },
+  "hamburguesa": { icon: "🍔", bg: "linear-gradient(135deg, #F09819, #EDDE5D)" },
+  "lomo": { icon: "🥖", bg: "linear-gradient(135deg, #c94b4b, #e8775f)" },
+  "suprema": { icon: "🍗", bg: "linear-gradient(135deg, #f7971e, #ffd200)" },
+  "empanada": { icon: "🥟", bg: "linear-gradient(135deg, #e8a87c, #d4856b)" },
+  "pizza": { icon: "🍕", bg: "linear-gradient(135deg, #e44d26, #f7971e)" },
+  "papa": { icon: "🍟", bg: "linear-gradient(135deg, #f5af19, #f2c94c)" },
+  "coca": { icon: "🥤", bg: "linear-gradient(135deg, #c31432, #240b36)" },
+  "agua": { icon: "💧", bg: "linear-gradient(135deg, #56CCF2, #2F80ED)" },
+  "cerveza": { icon: "🍺", bg: "linear-gradient(135deg, #f7971e, #c9a227)" },
+  "quilmes": { icon: "🍺", bg: "linear-gradient(135deg, #f7971e, #c9a227)" },
+  "fernet": { icon: "🥃", bg: "linear-gradient(135deg, #2c3e50, #4a3728)" },
+  "café": { icon: "☕", bg: "linear-gradient(135deg, #6D4C41, #4E342E)" },
+  "cafe": { icon: "☕", bg: "linear-gradient(135deg, #6D4C41, #4E342E)" },
+  "cortado": { icon: "☕", bg: "linear-gradient(135deg, #6D4C41, #4E342E)" },
+  "submarino": { icon: "🍫", bg: "linear-gradient(135deg, #78522e, #c4956a)" },
+  "flan": { icon: "🍮", bg: "linear-gradient(135deg, #f2994a, #f2c94c)" },
+  "brownie": { icon: "🍫", bg: "linear-gradient(135deg, #3E2723, #8D6E63)" },
+};
+
+const getProductStyle = (nombre) => {
+  const lower = nombre.toLowerCase();
+  for (const [key, style] of Object.entries(PROD_ICONS)) {
+    if (lower.includes(key)) return style;
+  }
+  return { icon: "🍽️", bg: "linear-gradient(135deg, #888, #555)" };
+};
+
+const KB = [["Q","W","E","R","T","Y","U","I","O","P"],["A","S","D","F","G","H","J","K","L","Ñ"],["⌫","Z","X","C","V","B","N","M","OK"]];
+const C = { bg: "#FAFAF7", card: "#FFFFFF", border: "#E8E5DF", text: "#1A1A1A", muted: "#8C8780", accent: "#D4532A", accentLight: "#FEF0EC", success: "#2D8F5E", successLight: "#E8F5EE", warm: "#F5F0E8", warmDark: "#3D3428" };
+const SC = { WELCOME: 0, CATEGORIES: 1, ITEMS: 2, SUGGEST: 3, NAME: 4, CONFIRM: 5, DONE: 6 };
+
+window.__App = function TabletAutoservicio() {
+  const [screen, setScreen] = useState(SC.WELCOME);
+  const [categorias, setCategorias] = useState([]);
+  const [productosByCat, setProductosByCat] = useState({});
+  const [selectedCat, setSelectedCat] = useState(null);
+  const [visitedCats, setVisitedCats] = useState([]);
+  const [carrito, setCarrito] = useState([]);
+  const [nombre, setNombre] = useState("");
+  const [numPedido, setNumPedido] = useState(null);
+  const [addedId, setAddedId] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Load data from API
+  useEffect(() => {
+    const load = async () => {
+      const prods = await apiFetch('/productos');
+      if (prods && prods.length > 0) {
+        const catsMap = {};
+        prods.forEach(p => {
+          if (p.categoria) {
+            const catId = p.categoria.id;
+            if (!catsMap[catId]) {
+              const style = CAT_STYLES[p.categoria.nombre] || DEFAULT_STYLE;
+              catsMap[catId] = { ...p.categoria, ...style, items: [] };
+            }
+            const pStyle = getProductStyle(p.nombre);
+            catsMap[catId].items.push({ ...p, ...pStyle });
+          }
+        });
+        const cats = Object.values(catsMap).sort((a, b) => (a.orden || 0) - (b.orden || 0));
+        setCategorias(cats);
+        const byCat = {};
+        cats.forEach(c => { byCat[c.id] = c.items; });
+        setProductosByCat(byCat);
+      }
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  const total = carrito.reduce((s, i) => s + i.precio * i.cantidad, 0);
+  const cantItems = carrito.reduce((s, i) => s + i.cantidad, 0);
+
+  const agregarItem = (item) => {
+    setCarrito(prev => {
+      const ex = prev.find(i => i.id === item.id);
+      if (ex) return prev.map(i => i.id === item.id ? { ...i, cantidad: i.cantidad + 1 } : i);
+      return [...prev, { ...item, cantidad: 1 }];
+    });
+    setAddedId(item.id);
+    setTimeout(() => setAddedId(null), 500);
+  };
+
+  const quitarItem = (id) => setCarrito(prev => {
+    const it = prev.find(i => i.id === id);
+    if (it && it.cantidad > 1) return prev.map(i => i.id === id ? { ...i, cantidad: i.cantidad - 1 } : i);
+    return prev.filter(i => i.id !== id);
+  });
+
+  const resetear = () => { setScreen(SC.WELCOME); setCarrito([]); setNombre(""); setNumPedido(null); setSelectedCat(null); setVisitedCats([]); };
+
+  const playOrderSound = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const play = (f, t, d) => { const o = ctx.createOscillator(); const g = ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.frequency.value = f; o.type = "sine"; g.gain.setValueAtTime(0.3, ctx.currentTime + t); g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + t + d); o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + d); };
+      play(1100, 0, 0.15); play(880, 0.18, 0.5); play(1320, 0.55, 0.6);
+      setTimeout(() => ctx.close(), 1500);
+    } catch(e) {}
+  };
+
+  const confirmarPedido = async () => {
+    // Send as notification to caja - NOT creating pedido directly
+    const pedidoData = {
+      id: Date.now(),
+      nombre: nombre,
+      items: carrito.map(i => ({ nombre: i.nombre, cantidad: i.cantidad, precio: i.precio, producto_id: i.id })),
+      total,
+      timestamp: new Date().toISOString(),
+    };
+
+    // Send to server which broadcasts to caja via WebSocket
+    const result = await apiFetch('/autoservicio/pedido', {
+      method: 'POST',
+      body: pedidoData,
+    });
+
+    setNumPedido(result?.numero || Math.floor(Math.random() * 900) + 100);
+    playOrderSound();
+    setScreen(SC.DONE);
+    setTimeout(resetear, 11000);
+  };
+
+  const handleKey = (k) => {
+    if (k === "⌫") setNombre(p => p.slice(0, -1));
+    else if (k === "OK") { if (nombre.trim()) setScreen(SC.CONFIRM); }
+    else if (k === " ") setNombre(p => p + " ");
+    else setNombre(p => p.length < 20 ? p + k : p);
+  };
+
+  const selectCategory = (catId) => {
+    setSelectedCat(catId);
+    if (!visitedCats.includes(catId)) setVisitedCats(prev => [...prev, catId]);
+    setScreen(SC.ITEMS);
+  };
+
+  const doneWithCategory = () => {
+    const catIds = categorias.map(c => c.id);
+    const nextCat = catIds.find(c => !visitedCats.includes(c) && c !== selectedCat);
+    if (nextCat && carrito.length > 0) {
+      setSelectedCat(nextCat);
+      setScreen(SC.SUGGEST);
+    } else if (carrito.length > 0) {
+      setScreen(SC.NAME);
+    } else {
+      setScreen(SC.CATEGORIES);
+    }
+  };
+
+  const acceptSuggestion = () => {
+    if (!visitedCats.includes(selectedCat)) setVisitedCats(prev => [...prev, selectedCat]);
+    setScreen(SC.ITEMS);
+  };
+
+  const currentCat = categorias.find(c => c.id === selectedCat);
+  const currentItems = selectedCat ? (productosByCat[selectedCat] || []) : [];
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Nunito', sans-serif" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 60, marginBottom: 16 }}>🍽️</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: C.muted }}>Cargando menú...</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'Nunito', 'DM Sans', -apple-system, sans-serif", color: C.text, display: "flex", flexDirection: "column", userSelect: "none", WebkitUserSelect: "none" }}>
+      <style>{`
+        @import url('/fonts/nunito-pf.css');
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        body { margin: 0; overflow-x: hidden; }
+        ::-webkit-scrollbar { width: 14px; }
+        ::-webkit-scrollbar-track { background: #E8E5DF40; border-radius: 7px; margin: 4px; }
+        ::-webkit-scrollbar-thumb { background: #C4B8A8; border-radius: 7px; border: 3px solid transparent; background-clip: padding-box; }
+        @keyframes popIn { 0% { transform: scale(0.85); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes bounceIn { 0% { transform: scale(0); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        @keyframes fadeSlide { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        .pop-in { animation: popIn 0.35s ease-out; }
+        .slide-up { animation: slideUp 0.4s ease-out; }
+        .bounce-in { animation: bounceIn 0.4s ease-out; }
+        .float-anim { animation: float 3s ease-in-out infinite; }
+        .fade-slide { animation: fadeSlide 0.3s ease-out both; }
+        .tap:active { transform: scale(0.96) !important; }
+      `}</style>
+
+      {/* WELCOME */}
+      {screen === SC.WELCOME && (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: `linear-gradient(150deg, ${C.warm} 0%, ${C.bg} 50%, #FEF0EC 100%)`, padding: 40, textAlign: "center" }}>
+          <div className="float-anim" style={{ fontSize: 80, marginBottom: 24 }}>🍽️</div>
+          <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 48, fontWeight: 900, color: C.warmDark, lineHeight: 1.1, marginBottom: 12 }}>¡Bienvenido!</h1>
+          <p style={{ fontSize: 20, color: C.muted, fontWeight: 600, marginBottom: 40, maxWidth: 400 }}>Hacé tu pedido desde acá y te avisamos cuando esté listo</p>
+          <button onClick={() => setScreen(SC.CATEGORIES)} className="tap" style={{ padding: "22px 60px", borderRadius: 20, border: "none", background: C.accent, color: "#fff", fontSize: 22, fontWeight: 800, cursor: "pointer", boxShadow: `0 8px 30px ${C.accent}40` }}>EMPEZAR →</button>
+        </div>
+      )}
+
+      {/* CATEGORIES */}
+      {screen === SC.CATEGORIES && (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", background: C.bg }}>
+          <div style={{ padding: "20px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+            <div><div style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 800, color: C.warmDark }}>¿Qué querés pedir?</div></div>
+            <button onClick={resetear} className="tap" style={{ padding: "8px 16px", borderRadius: 10, border: `2px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>✕ Cancelar</button>
+          </div>
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 28px 28px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 20, width: "100%", maxWidth: 600 }}>
+              {categorias.map((cat, idx) => {
+                const itemsInCart = carrito.filter(i => (productosByCat[cat.id] || []).find(x => x.id === i.id));
+                const catTotal = itemsInCart.reduce((s, i) => s + i.precio * i.cantidad, 0);
+                return (
+                  <div key={cat.id} className="fade-slide tap" style={{ animationDelay: `${idx * 0.08}s` }} onClick={() => selectCategory(cat.id)}>
+                    <div style={{ borderRadius: 24, overflow: "hidden", cursor: "pointer", background: cat.bg, position: "relative", boxShadow: `0 8px 30px ${cat.color}30`, minHeight: 180, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center" }}>
+                      <div style={{ fontSize: 56, marginBottom: 10 }}>{cat.emoji}</div>
+                      <div style={{ fontSize: 24, fontWeight: 900, color: "#fff", textShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>{cat.nombre}</div>
+                      <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", fontWeight: 600, marginTop: 4 }}>{cat.desc}</div>
+                      {itemsInCart.length > 0 && <div style={{ position: "absolute", top: 12, right: 12, padding: "4px 12px", borderRadius: 20, background: "rgba(255,255,255,0.95)", color: cat.color, fontSize: 12, fontWeight: 900 }}>{itemsInCart.reduce((s, i) => s + i.cantidad, 0)} · ${catTotal.toLocaleString()}</div>}
+                      {visitedCats.includes(cat.id) && <div style={{ position: "absolute", top: 12, left: 12, width: 28, height: 28, borderRadius: "50%", background: "rgba(255,255,255,0.9)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>✓</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          {carrito.length > 0 && (
+            <div className="slide-up" style={{ padding: "12px 28px", background: C.card, borderTop: `2px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+              <div><span style={{ fontSize: 13, fontWeight: 700, color: C.muted }}>{cantItems} items</span><span style={{ fontSize: 20, fontWeight: 900, color: C.warmDark, marginLeft: 12 }}>${total.toLocaleString()}</span></div>
+              <button onClick={() => setScreen(SC.NAME)} className="tap" style={{ padding: "14px 32px", borderRadius: 14, border: "none", background: C.accent, color: "#fff", fontSize: 16, fontWeight: 800, cursor: "pointer" }}>FINALIZAR →</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ITEMS */}
+      {screen === SC.ITEMS && currentCat && (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", background: C.bg }}>
+          <div style={{ padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", background: C.card, borderBottom: `2px solid ${C.border}`, flexShrink: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <button onClick={() => setScreen(SC.CATEGORIES)} className="tap" style={{ padding: "8px 14px", borderRadius: 10, border: `2px solid ${C.border}`, background: "transparent", color: C.text, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>← Volver</button>
+              <span style={{ fontSize: 24 }}>{currentCat.emoji}</span>
+              <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 800, color: currentCat.color }}>{currentCat.nombre}</span>
+            </div>
+            {carrito.length > 0 && <span style={{ fontSize: 18, fontWeight: 900, color: C.warmDark }}>${total.toLocaleString()}</span>}
+          </div>
+          <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14 }}>
+              {currentItems.map(item => {
+                const enCarrito = carrito.find(i => i.id === item.id);
+                return (
+                  <div key={item.id} className={`tap ${addedId === item.id ? "bounce-in" : "fade-slide"}`} onClick={() => agregarItem(item)}
+                    style={{ borderRadius: 16, overflow: "hidden", background: C.card, border: `2px solid ${enCarrito ? currentCat.color : C.border}`, cursor: "pointer", position: "relative" }}>
+                    <div style={{ position: "relative", height: 130, overflow: "hidden" }}>
+                      <div style={{ width: "100%", height: "100%", background: item.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 52 }}>{item.icon}</div>
+                      {enCarrito && <div style={{ position: "absolute", top: 8, right: 8, width: 30, height: 30, borderRadius: "50%", background: currentCat.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 14, fontWeight: 900 }}>{enCarrito.cantidad}</div>}
+                    </div>
+                    <div style={{ padding: "10px 12px 12px" }}>
+                      <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 8 }}>{item.nombre}</div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: 19, fontWeight: 900, color: currentCat.color }}>${item.precio.toLocaleString()}</span>
+                        <div style={{ width: 32, height: 32, borderRadius: 10, background: currentCat.color + "15", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, color: currentCat.color }}>+</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div style={{ padding: "12px 24px", background: C.card, borderTop: `2px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+            <div style={{ display: "flex", gap: 6, overflowX: "auto", flex: 1, marginRight: 12 }}>
+              {carrito.map(item => (
+                <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 8px 4px 4px", borderRadius: 8, background: C.warm, flexShrink: 0 }}>
+                  <div style={{ width: 26, height: 26, borderRadius: 5, background: item.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>{item.icon}</div>
+                  <span style={{ fontSize: 10, fontWeight: 700 }}>{item.nombre}</span>
+                  <span style={{ fontSize: 9, color: C.muted }}>x{item.cantidad}</span>
+                  <button onClick={e => { e.stopPropagation(); quitarItem(item.id); }} style={{ width: 18, height: 18, borderRadius: 4, border: "none", background: C.accent + "20", color: C.accent, fontSize: 10, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
+                </div>
+              ))}
+            </div>
+            <button onClick={doneWithCategory} className="tap" style={{ padding: "14px 28px", borderRadius: 14, border: "none", background: carrito.length > 0 ? C.accent : C.border, color: carrito.length > 0 ? "#fff" : C.muted, fontSize: 15, fontWeight: 800, cursor: "pointer", flexShrink: 0 }}>
+              {carrito.length > 0 ? "LISTO →" : "VOLVER"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* SUGGEST */}
+      {screen === SC.SUGGEST && currentCat && (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: C.warm, padding: 28 }}>
+          <div className="pop-in" style={{ width: "100%", maxWidth: 500, textAlign: "center" }}>
+            <div style={{ fontSize: 56, marginBottom: 12 }}>{currentCat.emoji}</div>
+            <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 30, fontWeight: 800, color: C.warmDark, marginBottom: 6 }}>
+              {currentCat.nombre === "Bebidas" ? "¿Algo para tomar?" : currentCat.nombre === "Postres" ? "¿Un postre para cerrar?" : currentCat.nombre === "Cafetería" ? "¿Un cafecito?" : "¿Algo más?"}
+            </h2>
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min((productosByCat[currentCat.id] || []).length, 3)}, 1fr)`, gap: 12, marginBottom: 28, marginTop: 20 }}>
+              {(productosByCat[currentCat.id] || []).slice(0, 3).map(item => {
+                const enCarrito = carrito.find(i => i.id === item.id);
+                return (
+                  <div key={item.id} className="fade-slide tap" onClick={() => agregarItem(item)}
+                    style={{ borderRadius: 16, overflow: "hidden", background: C.card, border: `2px solid ${enCarrito ? currentCat.color : C.border}`, cursor: "pointer", position: "relative" }}>
+                    {enCarrito && <div style={{ position: "absolute", top: 8, right: 8, width: 30, height: 30, borderRadius: "50%", background: currentCat.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 14, fontWeight: 900, zIndex: 2 }}>{enCarrito.cantidad}</div>}
+                    <div style={{ width: "100%", height: 100, background: item.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 40 }}>{item.icon}</div>
+                    <div style={{ padding: "8px 10px" }}>
+                      <div style={{ fontWeight: 800, fontSize: 13 }}>{item.nombre}</div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+                        <span style={{ fontSize: 16, fontWeight: 900, color: currentCat.color }}>${item.precio.toLocaleString()}</span>
+                        <div style={{ padding: "4px 12px", borderRadius: 8, background: enCarrito ? C.success : currentCat.color, color: "#fff", fontSize: 11, fontWeight: 800 }}>{enCarrito ? "✓ x" + enCarrito.cantidad : "+ Agregar"}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+              <button onClick={() => setScreen(SC.NAME)} className="tap" style={{ padding: "16px 36px", borderRadius: 16, border: `2px solid ${C.border}`, background: C.card, color: C.text, fontSize: 16, fontWeight: 800, cursor: "pointer" }}>No, gracias</button>
+              <button onClick={acceptSuggestion} className="tap" style={{ padding: "16px 36px", borderRadius: 16, border: "none", background: currentCat.color, color: "#fff", fontSize: 16, fontWeight: 800, cursor: "pointer" }}>¡Sí, ver {currentCat.nombre.toLowerCase()}!</button>
+            </div>
+            <div style={{ marginTop: 16, fontSize: 13, color: C.muted }}>Tu pedido: {cantItems} items · <span style={{ fontWeight: 900, color: C.warmDark }}>${total.toLocaleString()}</span></div>
+          </div>
+        </div>
+      )}
+
+      {/* NAME + KEYBOARD */}
+      {screen === SC.NAME && (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", background: `linear-gradient(150deg, ${C.warm} 0%, ${C.bg} 100%)` }}>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "16px 20px 0" }}>
+            <div className="pop-in" style={{ width: "100%", maxWidth: 480, textAlign: "center" }}>
+              <div style={{ fontSize: 44, marginBottom: 8 }}>👋</div>
+              <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 28, fontWeight: 800, color: C.warmDark, marginBottom: 6 }}>¿Tu nombre?</h2>
+              <p style={{ fontSize: 14, color: C.muted, fontWeight: 600, marginBottom: 16 }}>Para avisarte cuando esté listo</p>
+              <div style={{ width: "100%", padding: "14px 20px", borderRadius: 16, border: `3px solid ${nombre ? C.accent : C.border}`, background: C.card, minHeight: 54, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+                <span style={{ fontSize: 28, fontWeight: 800, color: nombre ? C.text : C.muted }}>{nombre || "Tocá las letras..."}</span>
+                {nombre && <span style={{ width: 3, height: 26, background: C.accent, marginLeft: 2, borderRadius: 2, animation: "blink 1s infinite" }} />}
+              </div>
+              <div style={{ fontSize: 13, color: C.muted }}>Total: <span style={{ fontWeight: 900, color: C.warmDark, fontSize: 17 }}>${total.toLocaleString()}</span></div>
+            </div>
+          </div>
+          <div style={{ padding: "10px 12px 16px", background: C.card, borderTop: `2px solid ${C.border}`, flexShrink: 0 }}>
+            {KB.map((row, ri) => (
+              <div key={ri} style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 6 }}>
+                {row.map(k => {
+                  const isSp = k === "⌫" || k === "OK"; const isOK = k === "OK";
+                  return (
+                    <button key={k} onClick={() => handleKey(k)} className="tap" style={{
+                      flex: isSp ? 1.5 : 1, maxWidth: isSp ? 90 : 54, height: 54, borderRadius: 12, border: "none", cursor: "pointer",
+                      background: isOK ? (nombre.trim() ? C.accent : C.border) : k === "⌫" ? C.warm : C.bg,
+                      color: isOK ? "#fff" : C.text, fontSize: isSp ? 15 : 20, fontWeight: 700, fontFamily: "'Nunito', sans-serif",
+                    }}>{k}</button>
+                  );
+                })}
+              </div>
+            ))}
+            <div style={{ display: "flex", justifyContent: "center", gap: 6 }}>
+              <button onClick={() => setScreen(SC.CATEGORIES)} className="tap" style={{ flex: 1, maxWidth: 90, height: 50, borderRadius: 12, border: `2px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>← Menú</button>
+              <button onClick={() => handleKey(" ")} className="tap" style={{ flex: 4, height: 50, borderRadius: 12, border: "none", background: C.bg, color: C.muted, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>espacio</button>
+              <button onClick={() => { if (nombre.trim()) setScreen(SC.CONFIRM); }} className="tap" style={{ flex: 1, maxWidth: 90, height: 50, borderRadius: 12, border: "none", background: nombre.trim() ? C.success : C.border, color: nombre.trim() ? "#fff" : C.muted, fontSize: 13, fontWeight: 800, cursor: "pointer" }}>Listo →</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM */}
+      {screen === SC.CONFIRM && (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: C.bg, padding: 28 }}>
+          <div className="pop-in" style={{ width: "100%", maxWidth: 440, textAlign: "center" }}>
+            <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 800, color: C.warmDark, marginBottom: 18 }}>🛒 ¿Todo listo, {nombre}?</h2>
+            <div style={{ padding: 18, borderRadius: 16, background: C.card, border: `2px solid ${C.border}`, textAlign: "left", marginBottom: 20 }}>
+              {carrito.map(item => (
+                <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: `1px solid ${C.border}30` }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 8, background: item.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>{item.icon}</div>
+                  <div style={{ flex: 1 }}><div style={{ fontWeight: 700, fontSize: 14 }}>{item.nombre}</div><div style={{ fontSize: 12, color: C.muted }}>x{item.cantidad}</div></div>
+                  <span style={{ fontWeight: 800, fontSize: 15, color: C.accent }}>${(item.precio * item.cantidad).toLocaleString()}</span>
+                </div>
+              ))}
+              <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 12, marginTop: 6 }}>
+                <span style={{ fontSize: 17, fontWeight: 800 }}>Total a pagar</span>
+                <span style={{ fontSize: 24, fontWeight: 900, color: C.warmDark }}>${total.toLocaleString()}</span>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 12 }}>
+              <button onClick={() => setScreen(SC.CATEGORIES)} className="tap" style={{ flex: 1, padding: "16px 0", borderRadius: 14, border: `2px solid ${C.border}`, background: C.card, color: C.text, fontSize: 15, fontWeight: 700, cursor: "pointer" }}>← Modificar</button>
+              <button onClick={confirmarPedido} className="tap" style={{ flex: 2, padding: "16px 0", borderRadius: 14, border: "none", background: C.success, color: "#fff", fontSize: 17, fontWeight: 800, cursor: "pointer" }}>✅ ENVIAR PEDIDO</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DONE */}
+      {screen === SC.DONE && (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: `linear-gradient(150deg, ${C.successLight} 0%, ${C.bg} 100%)`, padding: 28 }}>
+          <div className="pop-in" style={{ textAlign: "center" }}>
+            <div className="bounce-in" style={{ width: 90, height: 90, borderRadius: "50%", background: C.success, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 44, margin: "0 auto 20px" }}>✓</div>
+            <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 34, fontWeight: 800, color: C.warmDark, marginBottom: 8 }}>¡Pedido enviado!</h2>
+            <div style={{ padding: "24px 44px", borderRadius: 22, background: C.card, border: `3px solid ${C.success}40`, display: "inline-block", marginBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: C.muted, letterSpacing: "0.08em" }}>TU NÚMERO</div>
+              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 68, fontWeight: 900, color: C.success, lineHeight: 1 }}>#{numPedido}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: C.warmDark, marginTop: 6 }}>{nombre}</div>
+            </div>
+            <div style={{ padding: "14px 24px", borderRadius: 14, background: C.warm, marginBottom: 16, maxWidth: 380 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: C.warmDark }}>📢 Cuando tu pedido esté listo, te llamamos:</div>
+              <div style={{ fontSize: 28, fontWeight: 900, color: C.accent, marginTop: 4 }}>"{nombre}"</div>
+            </div>
+            <p style={{ fontSize: 14, color: C.muted, fontWeight: 600, marginBottom: 20 }}>Pagás cuando retirás en el mostrador</p>
+            <button onClick={resetear} className="tap" style={{ padding: "14px 36px", borderRadius: 14, border: `2px solid ${C.border}`, background: C.card, color: C.text, fontSize: 15, fontWeight: 700, cursor: "pointer" }}>Hacer otro pedido</button>
+            <div style={{ marginTop: 14, fontSize: 12, color: C.muted + "80" }}>Esta pantalla se reinicia automáticamente</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(window.__App));
+</script>
+</body>
+</html>
