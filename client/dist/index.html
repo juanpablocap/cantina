@@ -244,6 +244,7 @@ window.__App = function CantinaFull() {
   const [usbConnected, setUsbConnected] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [sysData, setSysData] = useState(null);
+  const [conectado, setConectado] = useState(true);
   const [sysHistory, setSysHistory] = useState([]);
   const [backupModal, setBackupModal] = useState(null); // null | { status, message }
   const mesaInputRef = useRef(null);
@@ -302,6 +303,7 @@ window.__App = function CantinaFull() {
     if (!loggedIn || !dataLoaded) return;
     const fetchSys = async () => {
       const data = await apiFetch('/system');
+      setConectado(!!data);
       if (data) {
         setSysData(data);
         setSysHistory(prev => {
@@ -602,11 +604,13 @@ window.__App = function CantinaFull() {
   };
 
   const marcarEntregado = async (id) => {
-    await apiFetch(`/pedidos/${id}`, { method: 'PUT', body: { estado: "entregado" } });
+    const result = await apiFetch(`/pedidos/${id}`, { method: 'PUT', body: { estado: "entregado" } });
+    if (!result) { showMsg("❌ Error al marcar entregado"); return; }
     setPedidos(prev => prev.map(p => p.id === id ? { ...p, estado: "entregado" } : p));
   };
   const marcarListo = async (id) => {
-    await apiFetch(`/pedidos/${id}`, { method: 'PUT', body: { estado: "listo" } });
+    const result = await apiFetch(`/pedidos/${id}`, { method: 'PUT', body: { estado: "listo" } });
+    if (!result) { showMsg("❌ Error al marcar listo"); return; }
     setPedidos(prev => prev.map(p => p.id === id ? { ...p, estado: "listo" } : p));
     playCajaListoSound();
   };
@@ -785,6 +789,13 @@ window.__App = function CantinaFull() {
       {msgExito && (
         <div className="anim-in" style={{ position: "fixed", top: 70, left: "50%", transform: "translateX(-50%)", zIndex: 100, padding: "12px 28px", borderRadius: 14, background: S.success, color: "#000", fontWeight: 800, fontSize: 14, boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}>
           {msgExito}
+        </div>
+      )}
+
+      {/* INDICADOR SIN CONEXIÓN */}
+      {dataLoaded && !conectado && (
+        <div style={{ position: "fixed", top: 8, right: 8, zIndex: 110, padding: "6px 14px", borderRadius: 10, background: "#FF4444", color: "#fff", fontWeight: 800, fontSize: 12, boxShadow: "0 4px 16px rgba(0,0,0,0.5)", letterSpacing: 1 }}>
+          ⚠ SIN CONEXIÓN
         </div>
       )}
 

@@ -22,7 +22,7 @@
 * [x] Crear script healthcheck.sh
 * [x] Verificar recuperación tras reinicio del servidor — todos los servicios levantan solos
 * [x] Verificar funcionamiento offline/LAN — CDN y fuentes movidos a local
-* [ ] Revisar manejo de pérdida de red local
+* [x] Revisar manejo de pérdida de red local — fix marcarEntregado/marcarListo + indicador SIN CONEXIÓN
 * [x] Verificar arranque automático completo tras reboot — orden correcto: postgresql → cantina-api → nginx (fix 502 aplicado)
 
 ## Backend
