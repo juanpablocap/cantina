@@ -77,34 +77,39 @@ window.__App = function TabletAutoservicio() {
   const [numPedido, setNumPedido] = useState(null);
   const [addedId, setAddedId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [errorCarga, setErrorCarga] = useState(false);
+  const [enviando, setEnviando] = useState(false);
+  const [errorEnvio, setErrorEnvio] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
   // Load data from API
   useEffect(() => {
+    setLoading(true);
+    setErrorCarga(false);
     const load = async () => {
       const prods = await apiFetch('/productos');
-      if (prods && prods.length > 0) {
-        const catsMap = {};
-        prods.forEach(p => {
-          if (p.categoria) {
-            const catId = p.categoria.id;
-            if (!catsMap[catId]) {
-              const style = CAT_STYLES[p.categoria.nombre] || DEFAULT_STYLE;
-              catsMap[catId] = { ...p.categoria, ...style, items: [] };
-            }
-            const pStyle = getProductStyle(p.nombre);
-            catsMap[catId].items.push({ ...p, ...pStyle });
+      if (!prods || prods.length === 0) { setErrorCarga(true); setLoading(false); return; }
+      const catsMap = {};
+      prods.forEach(p => {
+        if (p.categoria) {
+          const catId = p.categoria.id;
+          if (!catsMap[catId]) {
+            const style = CAT_STYLES[p.categoria.nombre] || DEFAULT_STYLE;
+            catsMap[catId] = { ...p.categoria, ...style, items: [] };
           }
-        });
-        const cats = Object.values(catsMap).sort((a, b) => (a.orden || 0) - (b.orden || 0));
-        setCategorias(cats);
-        const byCat = {};
-        cats.forEach(c => { byCat[c.id] = c.items; });
-        setProductosByCat(byCat);
-      }
+          const pStyle = getProductStyle(p.nombre);
+          catsMap[catId].items.push({ ...p, ...pStyle });
+        }
+      });
+      const cats = Object.values(catsMap).sort((a, b) => (a.orden || 0) - (b.orden || 0));
+      setCategorias(cats);
+      const byCat = {};
+      cats.forEach(c => { byCat[c.id] = c.items; });
+      setProductosByCat(byCat);
       setLoading(false);
     };
     load();
-  }, []);
+  }, [retryKey]);
 
   const total = carrito.reduce((s, i) => s + i.precio * i.cantidad, 0);
   const cantItems = carrito.reduce((s, i) => s + i.cantidad, 0);
@@ -137,7 +142,8 @@ window.__App = function TabletAutoservicio() {
   };
 
   const confirmarPedido = async () => {
-    // Send as notification to caja - NOT creating pedido directly
+    setEnviando(true);
+    setErrorEnvio(false);
     const pedidoData = {
       id: Date.now(),
       nombre: nombre,
@@ -145,14 +151,10 @@ window.__App = function TabletAutoservicio() {
       total,
       timestamp: new Date().toISOString(),
     };
-
-    // Send to server which broadcasts to caja via WebSocket
-    const result = await apiFetch('/autoservicio/pedido', {
-      method: 'POST',
-      body: pedidoData,
-    });
-
-    setNumPedido(result?.numero || Math.floor(Math.random() * 900) + 100);
+    const result = await apiFetch('/autoservicio/pedido', { method: 'POST', body: pedidoData });
+    setEnviando(false);
+    if (!result) { setErrorEnvio(true); return; }
+    setNumPedido(result.numero);
     playOrderSound();
     setScreen(SC.DONE);
     setTimeout(resetear, 11000);
@@ -198,6 +200,22 @@ window.__App = function TabletAutoservicio() {
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 60, marginBottom: 16 }}>🍽️</div>
           <div style={{ fontSize: 18, fontWeight: 700, color: C.muted }}>Cargando menú...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (errorCarga) {
+    return (
+      <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Nunito', sans-serif" }}>
+        <div style={{ textAlign: "center", padding: 40 }}>
+          <div style={{ fontSize: 60, marginBottom: 16 }}>⚠️</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: C.accent, marginBottom: 8 }}>Sistema no disponible</div>
+          <div style={{ fontSize: 15, color: C.muted, marginBottom: 28 }}>Pedí en el mostrador o intentá en un momento</div>
+          <button onClick={() => setRetryKey(k => k + 1)} className="tap"
+            style={{ padding: "14px 32px", borderRadius: 14, border: "none", background: C.accent, color: "#fff", fontSize: 16, fontWeight: 800, cursor: "pointer" }}>
+            Reintentar
+          </button>
         </div>
       </div>
     );
@@ -416,9 +434,16 @@ window.__App = function TabletAutoservicio() {
                 <span style={{ fontSize: 24, fontWeight: 900, color: C.warmDark }}>${total.toLocaleString()}</span>
               </div>
             </div>
+            {errorEnvio && (
+              <div style={{ padding: "12px 16px", borderRadius: 12, background: "#FFF0F0", border: "2px solid #FF444440", marginBottom: 12, fontSize: 14, fontWeight: 700, color: "#CC0000" }}>
+                ⚠️ No se pudo enviar. Pedí en el mostrador o intentá de nuevo.
+              </div>
+            )}
             <div style={{ display: "flex", gap: 12 }}>
               <button onClick={() => setScreen(SC.CATEGORIES)} className="tap" style={{ flex: 1, padding: "16px 0", borderRadius: 14, border: `2px solid ${C.border}`, background: C.card, color: C.text, fontSize: 15, fontWeight: 700, cursor: "pointer" }}>← Modificar</button>
-              <button onClick={confirmarPedido} className="tap" style={{ flex: 2, padding: "16px 0", borderRadius: 14, border: "none", background: C.success, color: "#fff", fontSize: 17, fontWeight: 800, cursor: "pointer" }}>✅ ENVIAR PEDIDO</button>
+              <button onClick={confirmarPedido} disabled={enviando} className="tap" style={{ flex: 2, padding: "16px 0", borderRadius: 14, border: "none", background: enviando ? C.border : C.success, color: enviando ? C.muted : "#fff", fontSize: 17, fontWeight: 800, cursor: enviando ? "default" : "pointer" }}>
+                {enviando ? "Enviando..." : "✅ ENVIAR PEDIDO"}
+              </button>
             </div>
           </div>
         </div>

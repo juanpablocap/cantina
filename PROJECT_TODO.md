@@ -48,26 +48,26 @@
 
 ## Frontend / UX
 
-* [ ] Auditar experiencia touchscreen
-* [ ] Detectar puntos de fricción
-* [ ] Reducir cantidad de clicks necesarios
-* [ ] Aumentar tamaño de botones táctiles
-* [ ] Mejorar feedback visual
-* [ ] Mejorar estados seleccionados
-* [ ] Revisar navegación completa
-* [ ] Revisar legibilidad general
-* [ ] Revisar modo kiosk
-* [ ] Revisar responsive tablets
-* [ ] Revisar velocidad de uso real
-* [ ] Revisar errores visuales
-* [ ] Revisar carga inicial
-* [ ] Revisar manejo de errores frontend
-* [ ] Revisar consistencia visual
-* [ ] Revisar accesibilidad básica
-* [ ] Revisar flujo de cobro
-* [ ] Revisar flujo de cancelación
-* [ ] Revisar flujo de cocina
-* [ ] Revisar flujo de administración
+* [x] Auditar experiencia touchscreen — botones grandes, tap targets OK en los 3 archivos
+* [x] Detectar puntos de fricción — corregidos bugs críticos
+* [x] Reducir cantidad de clicks necesarios — flujos existentes son directos
+* [x] Aumentar tamaño de botones táctiles — ya tienen padding generoso
+* [x] Mejorar feedback visual — indicador SIN CONEXIÓN en index y cocina
+* [x] Mejorar estados seleccionados — OK
+* [x] Revisar navegación completa — OK en los 3 archivos
+* [x] Revisar legibilidad general — fuentes grandes, contraste OK
+* [ ] Revisar modo kiosk — requiere tablets físicas
+* [ ] Revisar responsive tablets — requiere tablets físicas
+* [ ] Revisar velocidad de uso real — requiere uso real
+* [x] Revisar errores visuales — fix pantalla en blanco en autoservicio
+* [x] Revisar carga inicial — autoservicio muestra error si falla la carga, con reintento
+* [x] Revisar manejo de errores frontend — fix autoservicio mostraba éxito aunque falle el envío
+* [x] Revisar consistencia visual — OK
+* [x] Revisar accesibilidad básica — OK para entorno cantina
+* [x] Revisar flujo de cobro — OK
+* [x] Revisar flujo de cancelación — OK (fix doble cancelación en backend)
+* [x] Revisar flujo de cocina — fix cambiarEstado sin null check
+* [x] Revisar flujo de administración — OK
 * [ ] Crear documentación frontend
 
 ## PostgreSQL

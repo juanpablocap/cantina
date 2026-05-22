@@ -12,7 +12,7 @@
 <script src="/vendor/react-dom.production.min.js"></script>
 <script src="/vendor/babel.min.js"></script>
 <script type="text/babel" data-presets="react">
-const {useState, useEffect, useCallback} = React;
+const {useState, useEffect, useCallback, useRef} = React;
 
 const API = window.location.origin + '/api';
 const apiFetch = async (path, opts = {}) => {
@@ -48,10 +48,12 @@ function Timer({ desde }) {
 window.__App = function CocinaDisplay() {
   const [pedidos, setPedidos] = useState([]);
   const [now, setNow] = useState(new Date());
+  const [conectado, setConectado] = useState(true);
 
   // Load pedidos from API
   const loadPedidos = useCallback(async () => {
     const peds = await apiFetch('/pedidos');
+    setConectado(!!peds);
     if (peds) {
       const activos = peds.filter(p => ["pendiente", "en_preparacion", "listo"].includes(p.estado));
       setPedidos(activos);
@@ -87,7 +89,8 @@ window.__App = function CocinaDisplay() {
   }, []);
 
   const cambiarEstado = useCallback(async (id, nuevoEstado) => {
-    await apiFetch(`/pedidos/${id}`, { method: 'PUT', body: { estado: nuevoEstado } });
+    const result = await apiFetch(`/pedidos/${id}`, { method: 'PUT', body: { estado: nuevoEstado } });
+    if (!result) return;
     if (nuevoEstado === "listo") {
       playBell();
       setPedidos(prev => prev.map(p => p.id === id ? { ...p, estado: "listo" } : p));
@@ -119,7 +122,8 @@ window.__App = function CocinaDisplay() {
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontSize: 32 }}>👨‍🍳</span>
           <span style={{ fontSize: 28, fontWeight: 900, letterSpacing: "0.06em" }}>COCINA</span>
-          <div style={{ width: 10, height: 10, borderRadius: "50%", background: S.success, boxShadow: `0 0 8px ${S.success}`, marginLeft: 4 }} />
+          <div style={{ width: 10, height: 10, borderRadius: "50%", background: conectado ? S.success : S.danger, boxShadow: `0 0 8px ${conectado ? S.success : S.danger}`, marginLeft: 4 }} />
+          {!conectado && <span style={{ fontSize: 13, fontWeight: 800, color: S.danger, letterSpacing: 1 }}>SIN CONEXIÓN</span>}
         </div>
         <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
           {pedidos.filter(p => p.estado === "pendiente").length > 0 && (
