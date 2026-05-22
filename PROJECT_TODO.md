@@ -2,8 +2,8 @@
 
 ## PRIORIDAD ALTA — Estabilidad y Recovery
 
-* [ ] Auditar estructura completa del proyecto
-* [ ] Documentar arquitectura actual
+* [x] Auditar estructura completa del proyecto
+* [x] Documentar arquitectura actual — ver ARCHITECTURE.md
 * [ ] Verificar flujo completo de inicio del sistema
 * [x] Verificar servicios systemd existentes — cantina-api, nginx, postgresql enabled
 * [x] Confirmar autorestart de backend — Restart=always
