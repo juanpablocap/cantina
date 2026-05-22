@@ -14,7 +14,7 @@
 * [x] Revisar logs del sistema — sin errores críticos
 * [x] Revisar logs backend — fix sudo sin flag -n causaba auth failures silenciosos
 * [x] Revisar logs nginx — limpio
-* [ ] Revisar manejo de errores PostgreSQL
+* [x] Revisar manejo de errores PostgreSQL — logs limpios, índices FK agregados, startup order correcto
 * [x] Crear script restart_backend.sh
 * [x] Crear script restart_all.sh
 * [x] Crear script backup.sh

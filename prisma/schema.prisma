@@ -38,6 +38,8 @@ model Producto {
   cat_id     Int
   categoria  Categoria @relation(fields: [cat_id], references: [id])
   items      PedidoItem[]
+
+  @@index([cat_id])
 }
 
 model Cliente {
@@ -59,6 +61,8 @@ model ClientePago {
   cliente    Cliente  @relation(fields: [cliente_id], references: [id])
   monto      Float
   fecha      DateTime @default(now())
+
+  @@index([cliente_id])
 }
 
 model Pedido {
@@ -77,6 +81,9 @@ model Pedido {
   cliente         Cliente?     @relation(fields: [cliente_id], references: [id])
   items           PedidoItem[]
   createdAt       DateTime     @default(now())
+
+  @@index([createdAt])
+  @@index([cliente_id])
 }
 
 model PedidoItem {
@@ -88,6 +95,9 @@ model PedidoItem {
   cantidad      Int
   precio        Float
   observaciones String?
+
+  @@index([pedido_id])
+  @@index([producto_id])
 }
 
 model CierreCaja {
