@@ -5,22 +5,23 @@
 * [ ] Auditar estructura completa del proyecto
 * [ ] Documentar arquitectura actual
 * [ ] Verificar flujo completo de inicio del sistema
-* [ ] Verificar servicios systemd existentes
-* [ ] Confirmar autorestart de backend
-* [ ] Confirmar autorestart de nginx
+* [x] Verificar servicios systemd existentes — cantina-api, nginx, postgresql enabled
+* [x] Confirmar autorestart de backend — Restart=always
+* [x] Confirmar autorestart de nginx — Restart=always (override en /etc/systemd/system/nginx.service.d/)
+* [x] Confirmar autorestart postgresql — Restart=on-failure (override en /etc/systemd/system/postgresql@18-main.service.d/)
 * [ ] Confirmar autorestart kiosk/chromium
 * [ ] Revisar manejo de errores críticos
 * [ ] Revisar logs del sistema
 * [ ] Revisar logs backend
 * [ ] Revisar logs nginx
 * [ ] Revisar manejo de errores PostgreSQL
-* [ ] Crear script restart_backend.sh
-* [ ] Crear script restart_all.sh
-* [ ] Crear script backup.sh
-* [ ] Crear script restore.sh
-* [ ] Crear script healthcheck.sh
+* [x] Crear script restart_backend.sh
+* [x] Crear script restart_all.sh
+* [x] Crear script backup.sh
+* [x] Crear script restore.sh
+* [x] Crear script healthcheck.sh
 * [ ] Verificar recuperación tras reinicio del servidor
-* [ ] Verificar funcionamiento offline/LAN
+* [x] Verificar funcionamiento offline/LAN — CDN y fuentes movidos a local
 * [ ] Revisar manejo de pérdida de red local
 * [ ] Verificar arranque automático completo tras reboot
 
@@ -83,8 +84,8 @@
 
 ## Nginx / Infraestructura
 
-* [ ] Revisar configuración nginx
-* [ ] Revisar reverse proxy
+* [x] Revisar configuración nginx — configurado como reverse proxy :80 → :3001
+* [x] Revisar reverse proxy — funcionando con soporte WebSocket
 * [ ] Revisar puertos abiertos
 * [ ] Revisar seguridad básica LAN
 * [ ] Revisar manejo de errores nginx
