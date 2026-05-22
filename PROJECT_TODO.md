@@ -4,12 +4,12 @@
 
 * [x] Auditar estructura completa del proyecto
 * [x] Documentar arquitectura actual — ver ARCHITECTURE.md
-* [ ] Verificar flujo completo de inicio del sistema
+* [x] Verificar flujo completo de inicio del sistema — orden correcto verificado
 * [x] Verificar servicios systemd existentes — cantina-api, nginx, postgresql enabled
 * [x] Confirmar autorestart de backend — Restart=always
 * [x] Confirmar autorestart de nginx — Restart=always (override en /etc/systemd/system/nginx.service.d/)
 * [x] Confirmar autorestart postgresql — Restart=on-failure (override en /etc/systemd/system/postgresql@18-main.service.d/)
-* [ ] Confirmar autorestart kiosk/chromium
+* [ ] Confirmar autorestart kiosk/chromium — requiere tablets físicas
 * [x] Revisar manejo de errores críticos — fix sudo -n en restart y clear-cache
 * [x] Revisar logs del sistema — sin errores críticos
 * [x] Revisar logs backend — fix sudo sin flag -n causaba auth failures silenciosos
@@ -37,7 +37,7 @@
 * [x] Revisar queries PostgreSQL — transacciones en pedidos, cobrar, cancelar, pagos
 * [x] Revisar performance general — índices FK agregados, queries OK para escala actual
 * [x] Revisar variables de entorno — en .env y systemd service, OK
-* [x] Limpiar código no utilizado — dependencias no usadas eliminadas
+* [x] Limpiar código no utilizado — dependencias no usadas eliminadas (escpos, dotenv, pg)
 * [x] Revisar manejo de sesiones — PIN login, aceptable para LAN cerrada
 * [x] Revisar flujo de pedidos — transacción atómica pedido+stock, guard doble cancelación
 * [x] Revisar lógica de caja — cierre de caja OK
@@ -72,69 +72,64 @@
 
 ## PostgreSQL
 
-* [ ] Revisar estructura de base de datos
-* [ ] Revisar índices
-* [ ] Revisar relaciones
-* [ ] Revisar integridad de datos
-* [ ] Revisar backups
-* [ ] Probar restore completo
-* [ ] Revisar usuarios y permisos
-* [ ] Revisar tamaño y crecimiento DB
-* [ ] Crear documentación DB
+* [x] Revisar estructura de base de datos — 8 modelos bien definidos en schema.prisma
+* [x] Revisar índices — 6 índices FK agregados via migración Prisma
+* [x] Revisar relaciones — OK, todas con FK correctas
+* [x] Revisar integridad de datos — transacciones en backend para operaciones críticas
+* [x] Revisar backups — script backup.sh, retiene últimos 30, backup antes de restore
+* [ ] Probar restore completo desde cero
+* [ ] Revisar usuarios y permisos de PostgreSQL
+* [x] Revisar tamaño y crecimiento DB — DB pequeña (<50KB tablas), crecimiento lineal
+* [x] Crear documentación DB — schema documentado en ARCHITECTURE.md
 
 ## Nginx / Infraestructura
 
-* [x] Revisar configuración nginx — configurado como reverse proxy :80 → :3001
+* [x] Revisar configuración nginx — reverse proxy :80 → :3001 con WebSocket
 * [x] Revisar reverse proxy — funcionando con soporte WebSocket
 * [ ] Revisar puertos abiertos
 * [ ] Revisar seguridad básica LAN
-* [ ] Revisar manejo de errores nginx
-* [ ] Revisar headers
-* [ ] Revisar cache
-* [ ] Revisar logs nginx
-* [ ] Revisar startup order
-* [ ] Documentar infraestructura
+* [ ] Revisar manejo de errores nginx — custom error pages pendiente
+* [ ] Revisar headers — headers de seguridad pendiente
+* [ ] Revisar cache — estrategia de cache pendiente
+* [x] Revisar logs nginx — limpios, logueando en cantina.access.log / cantina.error.log
+* [x] Revisar startup order — After=cantina-api + wait_for_backend.sh (fix 502)
+* [x] Documentar infraestructura — en ARCHITECTURE.md
 
 ## Kiosk / Tablets
 
-* [ ] Revisar Chromium kiosk
-* [ ] Revisar fullscreen real
-* [ ] Revisar reconexión automática
-* [ ] Revisar comportamiento touchscreen
-* [ ] Revisar manejo de errores visuales
-* [ ] Revisar comportamiento tras reboot
-* [ ] Revisar estabilidad XRDP
-* [ ] Revisar audio/notificaciones
-* [ ] Revisar consumo de recursos
+* [ ] Revisar Chromium kiosk — requiere acceso físico
+* [ ] Revisar fullscreen real — requiere acceso físico
+* [ ] Revisar reconexión automática — requiere acceso físico
+* [ ] Revisar comportamiento touchscreen — requiere acceso físico
+* [ ] Revisar manejo de errores visuales — requiere acceso físico
+* [ ] Revisar comportamiento tras reboot — requiere acceso físico
+* [ ] Revisar estabilidad XRDP — requiere acceso físico
+* [ ] Revisar audio/notificaciones — requiere acceso físico
+* [ ] Revisar consumo de recursos — requiere acceso físico
 * [ ] Crear guía de tablets/kiosk
 
 ## Monitoreo y Soporte
 
-* [ ] Crear dashboard SSH/TUI básico
-* [ ] Mostrar estado servicios
-* [ ] Mostrar estado PostgreSQL
-* [ ] Mostrar estado nginx
-* [ ] Mostrar estado backend
-* [ ] Mostrar uso CPU/RAM/disco
-* [ ] Mostrar IP local
-* [ ] Mostrar uptime
-* [ ] Mostrar último backup
-* [ ] Agregar acciones restart rápidas
-* [ ] Agregar visualización rápida logs
+* [x] Mostrar estado servicios — healthcheck.sh
+* [x] Mostrar estado PostgreSQL — healthcheck.sh
+* [x] Mostrar estado nginx — healthcheck.sh
+* [x] Mostrar estado backend — healthcheck.sh
+* [x] Mostrar uso CPU/RAM/disco — healthcheck.sh
+* [x] Mostrar IP local — healthcheck.sh
+* [x] Mostrar uptime — healthcheck.sh
+* [x] Mostrar último backup — healthcheck.sh
+* [ ] Crear dashboard SSH/TUI interactivo con acciones rápidas
+* [ ] Agregar acciones restart rápidas desde dashboard
+* [ ] Agregar visualización rápida logs desde dashboard
 
 ## Documentación Técnica
 
+* [x] Crear ARCHITECTURE.md — completo
 * [ ] Crear README principal
-* [ ] Crear ARCHITECTURE.md
 * [ ] Crear RECOVERY.md
 * [ ] Crear BACKUP_GUIDE.md
 * [ ] Crear DEPLOYMENT.md
 * [ ] Crear SERVER_INFO.md
-* [ ] Documentar estructura carpetas
-* [ ] Documentar puertos
-* [ ] Documentar dependencias
-* [ ] Documentar servicios systemd
-* [ ] Documentar comandos útiles
 * [ ] Documentar troubleshooting
 
 ## Manual Cliente / Operación
@@ -153,12 +148,12 @@
 
 ## Calidad General
 
-* [ ] Detectar deuda técnica
-* [ ] Revisar archivos innecesarios
-* [ ] Revisar dependencias innecesarias
-* [ ] Mejorar estructura general
-* [ ] Mejorar mantenibilidad
+* [x] Detectar deuda técnica — identificada y corregida
+* [x] Revisar archivos innecesarios — ninguno
+* [x] Revisar dependencias innecesarias — eliminadas (escpos, dotenv, pg)
+* [x] Mejorar estructura general — OK
+* [x] Mejorar mantenibilidad — documentación, scripts, manejo de errores
 * [ ] Verificar consistencia completa
 * [ ] Validar funcionamiento final completo
 * [ ] Verificar que nada importante se haya roto
-* [ ] Crear estado “estable y documentado”
+* [ ] Crear estado "estable y documentado"
