@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Cantina POS — Cocina</title>
-<style>*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}body{margin:0;background:#070A12;color:#EAF0FF;overflow:hidden;height:100vh}#root{height:100vh;color:#EAF0FF}input:focus,select:focus{outline:none}::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#1A2140;border-radius:4px}</style>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{margin:0;background:#0A0D14;color:#F0F2F5;overflow:hidden;height:100vh}#root{height:100vh;color:#F0F2F5}input:focus,select:focus{outline:none}::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#1E2230;border-radius:3px}</style>
 </head>
 <body>
 <div id="root"></div>
@@ -25,7 +25,7 @@ const apiFetch = async (path, opts = {}) => {
 
 const itemNombre = (i) => i.nombre || (i.producto && i.producto.nombre) || "?";
 
-const S = { bg: "#070A12", surface: "#0D1120", surfaceHover: "#131829", border: "#1A2140", text: "#EAF0FF", muted: "#4A5578", accent: "#6366F1", danger: "#EF4444", warning: "#F59E0B", success: "#10B981", info: "#3B82F6" };
+const S = { bg: "#0A0D14", surface: "#12151C", border: "#1E2230", text: "#F0F2F5", muted: "#ffffff30", danger: "#FF4444", warning: "#FFB833", success: "#5BF5A0", info: "#6C9BCF" };
 
 function Timer({ desde }) {
   const [elapsed, setElapsed] = useState(0);
@@ -134,35 +134,29 @@ window.__App = function CocinaDisplay() {
     <div style={{ height: "100vh", background: S.bg, fontFamily: "'DM Sans', -apple-system, sans-serif", color: S.text, display: "flex", flexDirection: "column" }}>
       <style>{`
         @import url('/fonts/dm-jb.css');
-        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body { margin: 0; overflow: hidden; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-        @keyframes pulseCard { 0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); } 50% { box-shadow: 0 0 40px rgba(239,68,68,0.35); } }
-        @keyframes pulseBlue { 0%, 100% { background: #6366F1; } 50% { background: #4F52D8; } }
-        @keyframes modernIn { from { opacity: 0; transform: scale(0.97) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        @keyframes pulseCard { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,68,68,0); } 50% { box-shadow: 0 0 30px rgba(255,68,68,0.3); } }
+        @keyframes pulseBlue { 0%, 100% { background: #6C9BCF; } 50% { background: #4a7db5; } }
         .mod-banner { animation: pulseBlue 1.2s ease-in-out infinite; }
-        button { transition: transform 0.1s ease, opacity 0.1s ease; }
-        button:active { transform: scale(0.96) !important; }
       `}</style>
 
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 28px", background: `linear-gradient(180deg, ${S.surface} 0%, ${S.bg} 100%)`, borderBottom: `1px solid ${S.border}`, boxShadow: `0 1px 0 ${S.border}, 0 4px 20px rgba(0,0,0,0.5)`, flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <div style={{ width: 46, height: 46, borderRadius: 13, background: `linear-gradient(135deg, ${S.accent}, ${S.accent}88)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, boxShadow: `0 4px 16px ${S.accent}50` }}>👨‍🍳</div>
-          <span style={{ fontSize: 26, fontWeight: 900, letterSpacing: "0.08em", color: S.text }}>COCINA</span>
-          <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, background: (conectado ? S.success : S.danger) + "18", border: `1px solid ${(conectado ? S.success : S.danger)}35` }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: conectado ? S.success : S.danger, boxShadow: `0 0 6px ${conectado ? S.success : S.danger}` }} />
-            <span style={{ fontSize: 9, fontWeight: 800, color: conectado ? S.success : S.danger, letterSpacing: "0.05em" }}>{conectado ? "EN LÍNEA" : "SIN CONEXIÓN"}</span>
-          </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 28px", background: S.surface, borderBottom: `3px solid ${S.border}`, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 32 }}>👨‍🍳</span>
+          <span style={{ fontSize: 28, fontWeight: 900, letterSpacing: "0.06em" }}>COCINA</span>
+          <div style={{ width: 10, height: 10, borderRadius: "50%", background: conectado ? S.success : S.danger, boxShadow: `0 0 8px ${conectado ? S.success : S.danger}`, marginLeft: 4 }} />
+          {!conectado && <span style={{ fontSize: 13, fontWeight: 800, color: S.danger, letterSpacing: 1 }}>SIN CONEXIÓN</span>}
         </div>
         <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
           {pedidos.filter(p => p.estado === "pendiente").length > 0 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 12, background: S.danger + "18", border: `1px solid ${S.danger}40` }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: S.danger, boxShadow: `0 0 8px ${S.danger}` }} />
-              <span style={{ fontSize: 18, fontWeight: 900, color: S.danger, letterSpacing: "0.04em" }}>{pedidos.filter(p => p.estado === "pendiente").length} NUEVO{pedidos.filter(p => p.estado === "pendiente").length > 1 ? "S" : ""}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", borderRadius: 10, background: S.danger + "20", border: `2px solid ${S.danger}50` }}>
+              <span style={{ fontSize: 20, fontWeight: 900, color: S.danger }}>{pedidos.filter(p => p.estado === "pendiente").length} NUEVOS</span>
             </div>
           )}
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 28, fontWeight: 800, color: S.muted, letterSpacing: "0.04em" }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 26, fontWeight: 800, color: "#ffffff60" }}>
             {now.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
           </div>
         </div>
@@ -184,17 +178,14 @@ window.__App = function CocinaDisplay() {
               const itemsD = (p.items || []).filter(i => i.despacho_directo);
 
               return (
-                <div key={p.id} style={{ borderRadius: 20, overflow: "hidden", background: S.surface, border: `3px solid ${brd}`, boxShadow: isPend ? `0 0 40px ${brd}35, 0 8px 32px rgba(0,0,0,0.5)` : `0 8px 32px rgba(0,0,0,0.4)`, animation: isPend ? "pulseCard 2s infinite" : "none", transition: "all 0.3s ease" }}>
+                <div key={p.id} style={{ borderRadius: 18, overflow: "hidden", background: S.surface, border: `4px solid ${brd}`, boxShadow: isPend ? `0 0 30px ${brd}30` : `0 4px 20px rgba(0,0,0,0.3)`, animation: isPend ? "pulseCard 2s infinite" : "none" }}>
                   {/* Header */}
-                  <div style={{ padding: "16px 22px", display: "flex", justifyContent: "space-between", alignItems: "center", background: `linear-gradient(180deg, ${brd}25 0%, ${brd}10 100%)`, borderBottom: `2px solid ${brd}40` }}>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 52, fontWeight: 900, lineHeight: 1, color: brd, textShadow: `0 0 20px ${brd}50` }}>#{String(p.numero).padStart(2, "0")}</span>
-                      <div>
-                        <div style={{ fontSize: 18, fontWeight: 900, color: brd, letterSpacing: "0.06em" }}>
-                          {p.tipo === "mesa" ? "MESA " + p.mesa_numero : p.tipo === "barra" ? "BARRA" : "🛍️ LLEVAR"}
-                        </div>
-                        {p.nombre_cliente && <div style={{ fontSize: 13, fontWeight: 700, color: S.info, marginTop: 2 }}>📢 {p.nombre_cliente}</div>}
-                      </div>
+                  <div style={{ padding: "14px 22px", display: "flex", justifyContent: "space-between", alignItems: "center", background: brd + "20", borderBottom: `3px solid ${brd}40` }}>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
+                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 48, fontWeight: 900 }}>#{String(p.numero).padStart(2, "0")}</span>
+                      <span style={{ fontSize: 20, fontWeight: 800, color: brd }}>
+                        {p.tipo === "mesa" ? "MESA " + p.mesa_numero : p.tipo === "barra" ? "BARRA" : "🛍️ LLEVAR"}
+                      </span>
                     </div>
                     <Timer desde={p.createdAt} />
                   </div>
@@ -202,48 +193,51 @@ window.__App = function CocinaDisplay() {
                   {/* Banner modificado */}
                   {pedidosModificados[p.id] && (
                     <div className="mod-banner" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px" }}>
-                      <span style={{ fontSize: 20, fontWeight: 900, color: "#fff", letterSpacing: "0.04em" }}>✏️ PEDIDO MODIFICADO</span>
+                      <span style={{ fontSize: 22, fontWeight: 900, color: "#fff", letterSpacing: "0.04em" }}>✏️ PEDIDO MODIFICADO</span>
                       <button onClick={(e) => { e.stopPropagation(); setPedidosModificados(prev => { const n = {...prev}; delete n[p.id]; return n; }); }}
-                        style={{ padding: "10px 20px", borderRadius: 10, border: "2px solid rgba(255,255,255,0.6)", background: "rgba(255,255,255,0.12)", color: "#fff", fontSize: 16, fontWeight: 900, cursor: "pointer" }}>
+                        style={{ padding: "10px 20px", borderRadius: 10, border: "2px solid #fff", background: "transparent", color: "#fff", fontSize: 18, fontWeight: 900, cursor: "pointer" }}>
                         ✓ VISTO
                       </button>
                     </div>
                   )}
 
                   {/* Items */}
-                  <div style={{ padding: "12px 18px" }}>
+                  <div style={{ padding: "10px 18px" }}>
                     {itemsC.map((it, idx) => (
-                      <div key={idx} style={{ padding: "10px 0", borderBottom: idx < itemsC.length - 1 ? `1px solid ${S.border}` : "none", display: "flex", alignItems: "flex-start", gap: 14 }}>
-                        <div style={{ minWidth: 46, height: 46, borderRadius: 12, background: brd, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'JetBrains Mono', monospace", fontSize: 26, fontWeight: 900, color: "#000", flexShrink: 0 }}>{it.cantidad}</div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.25, color: S.text }}>{itemNombre(it)}</div>
-                          {it.observaciones && <div style={{ marginTop: 5, fontSize: 16, fontWeight: 700, color: S.danger, padding: "3px 8px", borderRadius: 6, background: S.danger + "15", display: "inline-block" }}>⚠️ {it.observaciones}</div>}
+                      <div key={idx} style={{ padding: "8px 0", borderBottom: idx < itemsC.length - 1 ? "1px solid #ffffff10" : "none", display: "flex", alignItems: "flex-start", gap: 12 }}>
+                        <div style={{ minWidth: 44, height: 44, borderRadius: 10, background: brd, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'JetBrains Mono', monospace", fontSize: 24, fontWeight: 900, color: "#000" }}>{it.cantidad}</div>
+                        <div>
+                          <div style={{ fontSize: 24, fontWeight: 800, lineHeight: 1.2 }}>{itemNombre(it)}</div>
+                          {it.observaciones && <div style={{ marginTop: 4, fontSize: 18, fontWeight: 700, color: "#FF6B6B" }}>⚠️ {it.observaciones}</div>}
                         </div>
                       </div>
                     ))}
                     {itemsD.length > 0 && (
-                      <div style={{ marginTop: 8, padding: "7px 12px", borderRadius: 10, background: S.success + "12", border: `1px solid ${S.success}30`, fontSize: 13, fontWeight: 700, color: S.success }}>
+                      <div style={{ marginTop: 6, padding: "6px 10px", borderRadius: 8, background: S.success + "10", border: `1px solid ${S.success}30`, fontSize: 14, fontWeight: 700, color: S.success }}>
                         🍺 +{itemsD.reduce((s, i) => s + i.cantidad, 0)} bebida(s) en mostrador
                       </div>
+                    )}
+                    {p.nombre_cliente && (
+                      <div style={{ marginTop: 6, fontSize: 16, fontWeight: 700, color: S.info }}>📢 {p.nombre_cliente}</div>
                     )}
                   </div>
 
                   {/* Actions */}
-                  <div style={{ padding: "10px 18px 16px" }}>
+                  <div style={{ padding: "10px 18px 14px" }}>
                     {isPend && (
-                      <button onClick={() => cambiarEstado(p.id, "en_preparacion")} style={{ width: "100%", padding: "17px 0", borderRadius: 13, border: "none", background: `linear-gradient(135deg, ${S.warning}, #E08900)`, color: "#000", fontSize: 21, fontWeight: 900, cursor: "pointer", boxShadow: `0 4px 20px ${S.warning}40` }}>
+                      <button onClick={() => cambiarEstado(p.id, "en_preparacion")} style={{ width: "100%", padding: "16px 0", borderRadius: 12, border: "none", background: `linear-gradient(135deg, ${S.warning}, #FF9500)`, color: "#000", fontSize: 22, fontWeight: 900, cursor: "pointer" }}>
                         🔥 EMPEZAR A PREPARAR
                       </button>
                     )}
                     {isPrep && (
-                      <button onClick={() => cambiarEstado(p.id, "listo")} style={{ width: "100%", padding: "17px 0", borderRadius: 13, border: "none", background: `linear-gradient(135deg, ${S.success}, #0CA070)`, color: "#000", fontSize: 21, fontWeight: 900, cursor: "pointer", boxShadow: `0 4px 20px ${S.success}40` }}>
+                      <button onClick={() => cambiarEstado(p.id, "listo")} style={{ width: "100%", padding: "16px 0", borderRadius: 12, border: "none", background: `linear-gradient(135deg, ${S.success}, #2DD47A)`, color: "#000", fontSize: 22, fontWeight: 900, cursor: "pointer" }}>
                         ✅ LISTO PARA ENTREGAR
                       </button>
                     )}
                     {isListo && (
                       <div style={{ display: "flex", gap: 8 }}>
-                        <div style={{ flex: 1, padding: "17px 0", borderRadius: 13, background: S.success + "20", color: S.success, fontSize: 17, fontWeight: 900, textAlign: "center", border: `1px solid ${S.success}30` }}>✅ ESPERANDO RETIRO</div>
-                        <button onClick={() => cambiarEstado(p.id, "entregado")} style={{ padding: "17px 18px", borderRadius: 13, border: "none", background: S.info, color: "#fff", fontSize: 15, fontWeight: 900, cursor: "pointer", boxShadow: `0 4px 16px ${S.info}40` }}>📦 ENTREGADO</button>
+                        <div style={{ flex: 1, padding: "16px 0", borderRadius: 12, background: S.success + "20", color: S.success, fontSize: 18, fontWeight: 900, textAlign: "center" }}>✅ ESPERANDO RETIRO</div>
+                        <button onClick={() => cambiarEstado(p.id, "entregado")} style={{ padding: "16px 18px", borderRadius: 12, border: "none", background: S.info, color: "#fff", fontSize: 16, fontWeight: 900, cursor: "pointer" }}>📦 ENTREGADO</button>
                       </div>
                     )}
                   </div>
