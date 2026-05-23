@@ -597,25 +597,6 @@ window.__App = function CantinaFull() {
   // Helper: get item name (handles both API format and local format)
   const itemNombre = (i) => i.nombre || (i.producto && i.producto.nombre) || "?";
 
-  // Simulate incoming autoservicio order (for demo)
-  const simularPedidoAutoservicio = () => {
-    const platos = ["Milanesa napolitana", "Hamburguesa completa", "Pizza muzzarella", "Lomo completo", "Empanadas x6"];
-    const bebidas = ["Coca Cola 500ml", "Cerveza Quilmes", "Agua mineral"];
-    const nombres = ["Juan", "María", "Pedro", "Lucas", "Ana", "Carlos", "Sofía"];
-    const items = [
-      { nombre: platos[Math.floor(Math.random() * platos.length)], cantidad: Math.floor(Math.random() * 2) + 1, precio: [8500, 7000, 7500, 9500, 5500][Math.floor(Math.random() * 5)] },
-      { nombre: bebidas[Math.floor(Math.random() * bebidas.length)], cantidad: 1, precio: [2000, 2500, 1500][Math.floor(Math.random() * 3)] },
-    ];
-    const pedAuto = {
-      id: Date.now(),
-      nombre: nombres[Math.floor(Math.random() * nombres.length)],
-      items,
-      total: items.reduce((s, i) => s + i.precio * i.cantidad, 0),
-      timestamp: new Date().toISOString(),
-    };
-    setPedidosAutoservicio(prev => [...prev, pedAuto]);
-    playAutoNotifSound();
-  };
 
   // Accept autoservicio order → create real pedido via API
   const aceptarPedidoAutoservicio = async (autoId) => {
@@ -3397,14 +3378,8 @@ window.__App = function CantinaFull() {
         </div>
       )}
 
-      {/* Simulate autoservicio button (demo only) */}
-      <button onClick={simularPedidoAutoservicio} style={{
-        position: "fixed", bottom: 12, left: 12, zIndex: 70,
-        padding: "8px 14px", borderRadius: 10, border: `2px solid ${S.border}`,
-        background: S.surface, color: S.muted, fontSize: 10, fontWeight: 700, cursor: "pointer",
-      }}>📱 Simular pedido autoservicio</button>
 
-      {/* ========================================= */}
+{/* ========================================= */}
       {/* BACKUP MODAL */}
       {/* ========================================= */}
       {backupModal && (
