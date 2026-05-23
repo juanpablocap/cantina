@@ -16,10 +16,18 @@ log "Instalando Netdata..."
 if command -v netdata &>/dev/null; then
   warn "Netdata ya está instalado — saltando instalación"
 else
-  curl -fsSL https://get.netdata.cloud/kickstart.sh -o /tmp/netdata-kickstart.sh
-  bash /tmp/netdata-kickstart.sh --stable-channel --no-updates --disable-telemetry <<< "y" || true
-  rm -f /tmp/netdata-kickstart.sh
-  log "Netdata instalado"
+  export DEBIAN_FRONTEND=noninteractive
+  # Intentar desde repos del sistema primero (más rápido, sin prompts)
+  if apt-get install -y netdata 2>/dev/null; then
+    log "Netdata instalado desde apt"
+  else
+    # Fallback: kickstart oficial con flags no-interactivos
+    log "Probando kickstart oficial..."
+    curl -fsSL https://get.netdata.cloud/kickstart.sh | \
+      bash -s -- --stable-channel --no-updates --disable-telemetry \
+        --non-interactive --install-type any || err "Instalación fallida"
+    log "Netdata instalado vía kickstart"
+  fi
 fi
 
 # ─── 2. Configurar Netdata ───────────────────────────────────────────────────
