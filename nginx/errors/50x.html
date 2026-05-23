@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Error del sistema — Cantina</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    text-align: center;
+    padding: 2rem;
+  }
+  .card {
+    background: #16213e;
+    border: 1px solid #e07a5f44;
+    border-radius: 16px;
+    padding: 3rem 2.5rem;
+    max-width: 480px;
+    width: 100%;
+  }
+  .icon { font-size: 4rem; margin-bottom: 1rem; }
+  h1 { font-size: 1.5rem; color: #e07a5f; margin-bottom: 0.75rem; }
+  p  { font-size: 1rem; color: #aaa; line-height: 1.6; margin-bottom: 1.5rem; }
+  .code { font-size: 0.8rem; color: #555; margin-top: 2rem; }
+  button {
+    background: #e07a5f;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 0.9rem 2rem;
+    font-size: 1rem;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  button:active { opacity: 0.8; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="icon">⚠️</div>
+  <h1>Error del sistema</h1>
+  <p>Ocurrió un error inesperado.<br>Intentá recargar la página. Si el problema continúa, avisá al encargado.</p>
+  <button onclick="location.reload()">Recargar</button>
+  <p class="code">Error 500/503 — <span id="ts"></span></p>
+</div>
+<script>document.getElementById('ts').textContent = new Date().toLocaleTimeString('es-AR');</script>
+</body>
+</html>

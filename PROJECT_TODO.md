@@ -103,7 +103,7 @@
 * [x] Agregar proxy /monitor/ → Netdata :19999
 * [x] Revisar puertos abiertos
 * [x] Revisar seguridad básica LAN
-* [ ] Revisar manejo de errores nginx — custom error pages pendiente
+* [x] Revisar manejo de errores nginx — custom error pages 502/500/503 en español, 404 disponible (SPA usa catch-all)
 * [x] Revisar headers — X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy
 * [x] Revisar cache — no-store en API, no-cache en HTML, max-age=86400+immutable en vendor/fonts/images
 * [x] Revisar logs nginx — limpios, logueando en cantina.access.log / cantina.error.log
