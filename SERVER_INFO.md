@@ -1,0 +1,84 @@
+# Información del servidor — Cantina POS
+
+## Datos de acceso
+
+| | |
+|---|---|
+| **IP local** | 192.168.100.54 |
+| **Hostname** | cantina-server |
+| **OS** | Ubuntu 26.04 LTS |
+| **Usuario** | cantina |
+| **Acceso SSH** | `ssh cantina@192.168.100.54` |
+
+## Hardware
+
+| Recurso | Valor |
+|---|---|
+| RAM | 7.1 GB |
+| Disco | 98 GB |
+
+## Servicios
+
+| Servicio | Puerto | Estado | Restart |
+|---|---|---|---|
+| `cantina-api` | 3001 | enabled | always (5s) |
+| `nginx` | 80 | enabled | always (5s) |
+| `postgresql@18-main` | 5432 | enabled | on-failure (10s) |
+
+## Rutas importantes
+
+| Qué | Ruta |
+|---|---|
+| Proyecto | `/home/cantina/cantina-pos/` |
+| Backend | `/home/cantina/cantina-pos/server.js` |
+| Frontend | `/home/cantina/cantina-pos/client/dist/` |
+| Backups DB | `/home/cantina/cantina-pos/backups/` |
+| Backups sistema | `/home/cantina/cantina-pos/backups/sistema/` |
+| Scripts | `/home/cantina/cantina-pos/scripts/` |
+| Config nginx | `/etc/nginx/sites-enabled/cantina` |
+| Service systemd | `/etc/systemd/system/cantina-api.service` |
+
+## Logs
+
+| Servicio | Comando |
+|---|---|
+| Backend | `journalctl -u cantina-api -f` |
+| Nginx acceso | `tail -f /var/log/nginx/cantina.access.log` |
+| Nginx errores | `tail -f /var/log/nginx/cantina.error.log` |
+| PostgreSQL | `journalctl -u postgresql -f` |
+
+## Base de datos
+
+| | |
+|---|---|
+| **Motor** | PostgreSQL 18.3 |
+| **Base de datos** | `cantina_pos` |
+| **Usuario DB** | `cantina` |
+| **Contraseña DB** | `cantina2025` |
+| **Puerto** | 5432 |
+| **Connection string** | `postgresql://cantina:cantina2025@localhost:5432/cantina_pos` |
+
+## Node.js
+
+| | |
+|---|---|
+| **Versión** | v20.20.2 |
+| **Puerto app** | 3001 |
+| **Variable de entorno** | `NODE_ENV=production` |
+
+## Versiones de software
+
+```
+Node.js  v20.20.2
+PostgreSQL 18.3
+Nginx (ver: nginx -v)
+```
+
+## URLs del sistema
+
+```
+App principal:   http://192.168.100.54/
+Cocina:          http://192.168.100.54/cocina.html
+Autoservicio:    http://192.168.100.54/autoservicio.html
+API health:      http://192.168.100.54/api/health
+```

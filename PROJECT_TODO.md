@@ -126,26 +126,26 @@
 ## Documentación Técnica
 
 * [x] Crear ARCHITECTURE.md — completo
-* [ ] Crear README principal
-* [ ] Crear RECOVERY.md
-* [ ] Crear BACKUP_GUIDE.md
-* [ ] Crear DEPLOYMENT.md
-* [ ] Crear SERVER_INFO.md
-* [ ] Documentar troubleshooting
+* [x] Crear README principal
+* [x] Crear RECOVERY.md
+* [x] Crear BACKUP_GUIDE.md
+* [x] Crear DEPLOYMENT.md
+* [x] Crear SERVER_INFO.md
+* [x] Documentar troubleshooting — incluido en RECOVERY.md
 
 ## Manual Cliente / Operación
 
-* [ ] Manual básico de uso
-* [ ] Cómo iniciar sistema
-* [ ] Cómo reiniciar sistema
-* [ ] Qué hacer si falla
-* [ ] Cómo usar pedidos
-* [ ] Cómo cobrar
-* [ ] Cómo cancelar pedidos
-* [ ] Cómo administrar productos
-* [ ] Cómo revisar cocina
-* [ ] Guía visual simple
-* [ ] Errores comunes y solución
+* [x] Manual básico de uso — OPERACION.md
+* [x] Cómo iniciar sistema — OPERACION.md + RECOVERY.md
+* [x] Cómo reiniciar sistema — RECOVERY.md
+* [x] Qué hacer si falla — RECOVERY.md
+* [x] Cómo usar pedidos — OPERACION.md
+* [x] Cómo cobrar — OPERACION.md
+* [x] Cómo cancelar pedidos — OPERACION.md
+* [x] Cómo administrar productos — OPERACION.md
+* [x] Cómo revisar cocina — OPERACION.md
+* [ ] Guía visual simple — requiere capturas de pantalla
+* [x] Errores comunes y solución — RECOVERY.md + OPERACION.md
 
 ## Calidad General
 
