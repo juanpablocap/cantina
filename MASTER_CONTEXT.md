@@ -3,46 +3,54 @@
 ## Objetivo
 
 Sistema POS touchscreen para cantina, funcionando 100% en red local (LAN), sin dependencia de internet.
-Incluye: impresora térmica para tickets, TV en el salón que muestra imágenes de promociones/ofertas en carrusel, tablets touchscreen para autoservicio de clientes.
+Incluye: impresora térmica para tickets, TV en el salón con carrusel de imágenes promocionales, tablets touchscreen para autoservicio de clientes, monitoreo profesional del servidor.
 
 ---
 
 ## Estado actual del sistema (mayo 2026)
 
-El sistema está **en producción y funcionando**. Todos los servicios levantan solos tras un reboot. No hay reescrituras pendientes — se trabaja en mejoras incrementales.
+El sistema está **en producción, estable y documentado**. Todos los servicios levantan solos tras un reboot. No hay reescrituras pendientes — se trabaja en mejoras incrementales.
 
-### Lo que ya está hecho
+### Completado
 
-- Backend Express + Socket.io + Prisma estable, con transacciones en operaciones críticas
-- Frontend React (Babel in-browser, sin build step) con tema visual moderno (Modern POS v2)
-- Sistema de doble tema: `modern` (default) y `classic`, switchable, persistido en localStorage
-- Autorestart de todos los servicios: postgresql → cantina-api → nginx (orden correcto)
-- Manejo de errores en todas las rutas; indicador visual SIN CONEXIÓN
-- Backups automáticos con script; retención de 30 días
-- Scripts de mantenimiento: `dashboard.sh`, `healthcheck.sh`, `backup.sh`, `restart_all.sh`
-- Documentación completa: ARCHITECTURE, DEPLOYMENT, RECOVERY, OPERACION, SERVER_INFO
-- TV promo carousel: página fullscreen `promo.html` + API de gestión de imágenes
-- Gestión de imágenes desde pendrive: upload base64 → disco + DB, eliminación desde el POS
+- Backend Express + Socket.io + Prisma estable, transacciones en operaciones críticas
+- Frontend React (Babel in-browser) con Modern POS v2 — bottom navigation, rediseño estructural completo
+- Sistema de doble tema: `modern` (default, indigo) y `classic` (terracota), switchable via toggle 🌙, persistido en localStorage
+- Autorestart de todos los servicios: postgresql → cantina-api → nginx → netdata
+- Monitoreo profesional: **Netdata v2.10.3** en `http://192.168.100.54/monitor/`
+- Sparklines Chart.js en la pestaña Sistema (CPU, RAM, disco, red RX/TX, últimos 10 min)
+- TV promo carousel: `promo.html` fullscreen + API completa (upload/delete imágenes)
+- Backups con retención de 30 días; scripts de mantenimiento completos
+- Documentación completa: ARCHITECTURE, DEPLOYMENT, RECOVERY, OPERACION, SERVER_INFO, MASTER_CONTEXT
+- Código demo eliminado (botón "Simular pedido autoservicio" removido)
+
+### Pendiente (requiere acceso físico)
+
+- Kiosk Chromium en tablets: fullscreen, reconexión, autorestart
+- Guía visual con capturas de pantalla
+- Restore completo desde cero (probar)
+- Revisión usuarios y permisos PostgreSQL
 
 ---
 
-## Stack técnico (estado real)
+## Stack técnico
 
 | Componente | Tecnología |
 |---|---|
 | OS | Ubuntu 26.04 LTS |
 | Backend | Node.js 20 + Express 5 + Socket.io 4 |
 | ORM | Prisma 5 sobre PostgreSQL 18 |
-| Frontend | React 18 con Babel in-browser (sin bundler en producción) |
-| Servidor web | Nginx — reverse proxy :80 → :3001, WebSocket habilitado |
-| Gestión procesos | systemd (cantina-api, nginx, postgresql@18-main) |
+| Frontend | React 18 + Babel in-browser + Chart.js 4.4 |
+| Servidor web | Nginx — :80 → :3001 + /monitor/ → :19999 |
+| Monitoreo | Netdata v2.10.3 (bind localhost:19999) |
+| Gestión procesos | systemd: cantina-api, nginx, postgresql@18-main, netdata |
 | Administración | SSH + scripts bash |
 
-**Sin dependencias de internet en runtime:** React, ReactDOM, Babel, fuentes y librerías están en `/vendor/` y `/fonts/`.
+**100% offline en runtime:** React, ReactDOM, Babel, Chart.js, fuentes en `/vendor/` y `/fonts/`.
 
 ---
 
-## Servidores y URLs
+## URLs del sistema
 
 | Pantalla | URL | Dispositivo |
 |---|---|---|
@@ -60,14 +68,39 @@ El sistema está **en producción y funcionando**. Todos los servicios levantan 
 
 | Archivo | Descripción |
 |---|---|
-| `server.js` | Backend completo (~640 líneas, un solo archivo) |
+| `server.js` | Backend completo (~660 líneas, un solo archivo) |
 | `client/dist/index.html` | POS principal (~3600 líneas, React inline) |
 | `client/dist/cocina.html` | Vista cocina |
 | `client/dist/autoservicio.html` | Tablet autoservicio |
-| `client/dist/promo.html` | TV carrusel de promociones |
+| `client/dist/promo.html` | TV carrusel de promociones (fullscreen, polling 30s) |
+| `client/dist/vendor/chart.umd.min.js` | Chart.js 4.4 — servido offline |
 | `prisma/schema.prisma` | Esquema DB (9 modelos) |
-| `scripts/` | Mantenimiento: healthcheck, backup, restart, dashboard |
 | `images/` | Imágenes del carrusel TV (servidas en `/images/`) |
+| `scripts/healthcheck.sh` | Estado completo del sistema |
+| `scripts/dashboard.sh` | TUI interactivo SSH con acciones rápidas |
+| `scripts/backup.sh` | Backup DB (retiene últimos 30) |
+| `scripts/restart_all.sh` | Reinicia todos los servicios en orden correcto |
+| `scripts/setup_netdata.sh` | Instala Netdata + configura nginx /monitor/ |
+| `scripts/nginx-cantina.conf` | Config nginx fuente (incluye /monitor/) |
+
+---
+
+## API — rutas principales
+
+**Sistema**
+- `GET /api/system` — CPU, RAM, disco, red RX/TX KB/s, temperatura, servicios, último backup
+- `GET /api/system/history` — historial de métricas (buffer circular 120 registros, ~10 min)
+- `POST /api/system/backup` — genera backup de la DB
+- `POST /api/system/clear-cache` — libera caché RAM
+
+**Carrusel TV**
+- `GET /api/carousel` — lista imágenes activas (usada por promo.html y el POS)
+- `POST /api/carousel` — sube imagen (base64 JSON), guarda en `/images/` y en DB
+- `DELETE /api/carousel/:id` — elimina imagen del disco y de la DB
+
+**WebSocket (Socket.io)**
+- Emite: `nuevo-pedido`, `pedido-actualizado`, `notif-autoservicio`
+- Recibe: `pedido-autoservicio`, `cambiar-estado`
 
 ---
 
@@ -82,63 +115,61 @@ ClientePago    → historial de pagos
 Pedido         → tipo mesa/barra, estado, cobrado, método de pago
 PedidoItem     → líneas del pedido con precio capturado
 CierreCaja     → resumen de cierre diario
-CarouselImage  → imágenes para el TV del salón (filename, orden, activo)
+CarouselImage  → imágenes para el TV (filename, orden, activo)
 ```
 
 **Estados de pedido:** `pendiente` → `en_preparacion` → `listo` → `entregado` / `cancelado`
 
+**Métodos de pago:** `efectivo`, `transferencia`, `cuenta_corriente`
+
 ---
 
-## Monitoreo — Netdata + sparklines inline
+## Monitoreo
 
-**Netdata** es el dashboard profesional de métricas del servidor.
-- URL: `http://192.168.100.54/monitor/` (proxy nginx → localhost:19999)
-- Se instala con: `sudo bash scripts/setup_netdata.sh`
-- Métricas en tiempo real: CPU, RAM, disco, red, temperatura, procesos, etc.
-- Resolución de 1 segundo, historial de horas/días incluido
-- Sin configuración adicional — auto-descubrimiento completo
+**Netdata v2.10.3** — dashboard profesional instalado y corriendo.
+- URL: `http://192.168.100.54/monitor/` (proxy nginx → `localhost:19999`)
+- Bind: solo a loopback, acceso únicamente vía nginx
+- 200+ métricas auto-descubiertas, resolución 1s, historial de horas/días
+- Reinstalación: `sudo bash scripts/setup_netdata.sh`
 
-**Sparklines inline en el POS** (pestaña Sistema):
-- Gráficos Chart.js en tiempo real: CPU%, RAM%, Disco%, Red RX, Red TX
-- Datos vienen de `GET /api/system` cada 5s + historial desde `GET /api/system/history`
-- Historial en memoria: últimos 120 registros (~10 min a 5s de intervalo)
-- Botón "📊 Monitor" abre Netdata completo en nueva pestaña
+**Sparklines inline en el POS** (pestaña Sistema → 6 chart-cards):
+- CPU%, RAM%, Disco%, Temperatura, Red RX, Red TX
+- Chart.js 4.4 servido offline desde `/vendor/`
+- Datos: `GET /api/system` cada 5s + `GET /api/system/history` al iniciar
+- Botón **📊 Monitor** abre Netdata en nueva pestaña
+
+---
 
 ## TV Promo Carousel
 
-- **Página:** `promo.html` — fullscreen, sin cursor, sin UI, diseñada para correr permanente en un TV
-- **Rotación:** cada 8 segundos con crossfade de 1.2s
-- **Polling:** consulta `/api/carousel` cada 30 segundos; si cambian las imágenes reconstruye el carrusel automáticamente
-- **API:** `POST /api/carousel` (sube imagen en base64, guarda en `/images/` + DB) · `DELETE /api/carousel/:id`
-- **Gestión:** desde la pestaña **Sistema** del POS → botón **📺 VER TV** para previsualizar · **📁 Abrir archivos** para seleccionar del pendrive · **📥 Importar todas**
-- **Almacenamiento:** `/home/cantina/cantina-pos/images/` (servido en `/images/` por Express)
+- `promo.html` — fullscreen, sin cursor, sin UI, para correr permanente en TV
+- Rota imágenes cada 8s con crossfade 1.2s
+- Polling cada 30s — se actualiza solo si cambian las imágenes
+- Gestión desde pestaña **Sistema** del POS: **📁 Abrir archivos** → seleccionar del pendrive → **📥 Importar todas**
+- Botón **📺 VER TV** abre promo.html en nueva pestaña
+- Archivos en `/home/cantina/cantina-pos/images/`, servidos en `/images/`
 
 ---
 
 ## Diseño UI (Modern POS v2)
 
-El frontend fue rediseñado estructuralmente (no solo colores):
+Rediseño estructural completo (no solo colores):
 
-- **Navegación:** bottom bar fija con 5 ítems (Venta / Pedidos / Mesas / Caja / ⋯Más) + drawer para pestañas secundarias
+- **Navegación:** bottom bar fija (Venta / Pedidos / Mesas / Caja / ⋯Más) + drawer secundario
 - **Header:** 52px con logo, reloj, estado DB, badge de usuario, toggle de tema
-- **Venta:** tarjetas de producto con banda de color de categoría, grid de mesas 8 columnas, panel carrito 38%
+- **Venta:** tarjetas de producto con banda de color por categoría, grid mesas 8 col, carrito 38%
 - **Pedidos:** agrupados por urgencia (LISTOS → EN COCINA → ENTREGADOS → COBRADOS → CANCELADOS)
-- **Numpad:** bottom sheet con botones de 68px
-- **Tema classic:** preservado intacto, seleccionable desde el toggle 🌙 — útil para debug o preferencia del operador
-- **Colores modern:** accent `#6366F1` (indigo), bg `#070A12`, surface `#0D1120`
+- **Numpad:** bottom sheet, botones 68px, backdrop blur
+- **Tema classic:** preservado intacto — útil para debug o preferencia personal
+- Tokens modern: accent `#6366F1`, bg `#070A12`, surface `#0D1120`
+- Tokens classic: accent `#E07A5F`, bg `#0A0D14`, surface `#12151C`
 
 ---
 
 ## Filosofía del proyecto
 
-**Priorizar:** estabilidad · simplicidad · recovery rápido · funcionamiento offline/LAN · mantenibilidad
+**Priorizar:** estabilidad · simplicidad · recovery rápido · offline/LAN · mantenibilidad a largo plazo
 
 **Evitar:** complejidad innecesaria · microservicios · dependencias cloud · reescrituras · arquitectura enterprise
 
-**Reglas:** analizar antes de cambiar · preservar funcionamiento existente · documentar todo · no agregar features no pedidas
-
----
-
-## UX Goals
-
-Usado por operadores no técnicos, en ambientes rápidos, con tablets touchscreen y posiblemente mala iluminación. La interfaz prioriza: botones grandes · pocos clicks · feedback visual inmediato · velocidad · simplicidad extrema.
+**Reglas de trabajo:** analizar antes de cambiar · preservar funcionamiento existente · documentar todo · no agregar features no pedidas · no hay código demo en producción
