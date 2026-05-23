@@ -1,91 +1,128 @@
-# Cantina POS System
+# Cantina POS — Master Context
 
 ## Objetivo
 
-Sistema POS touchscreen para cantina funcionando en red local/offline.
-con una impresora termica para los tickets, tambien un tv que se conecte al servidor y pueda mostrar imagenes de ofertas, noticias etc
+Sistema POS touchscreen para cantina, funcionando 100% en red local (LAN), sin dependencia de internet.
+Incluye: impresora térmica para tickets, TV en el salón que muestra imágenes de promociones/ofertas en carrusel, tablets touchscreen para autoservicio de clientes.
 
-## Entorno
+---
 
-* Ubuntu Server
-* PostgreSQL
-* Node.js backend
-* Vite frontend
-* Nginx
-* Chromium kiosk
-* Tablets touchscreen
-* Administración por SSH
+## Estado actual del sistema (mayo 2026)
+
+El sistema está **en producción y funcionando**. Todos los servicios levantan solos tras un reboot. No hay reescrituras pendientes — se trabaja en mejoras incrementales.
+
+### Lo que ya está hecho
+
+- Backend Express + Socket.io + Prisma estable, con transacciones en operaciones críticas
+- Frontend React (Babel in-browser, sin build step) con tema visual moderno (Modern POS v2)
+- Sistema de doble tema: `modern` (default) y `classic`, switchable, persistido en localStorage
+- Autorestart de todos los servicios: postgresql → cantina-api → nginx (orden correcto)
+- Manejo de errores en todas las rutas; indicador visual SIN CONEXIÓN
+- Backups automáticos con script; retención de 30 días
+- Scripts de mantenimiento: `dashboard.sh`, `healthcheck.sh`, `backup.sh`, `restart_all.sh`
+- Documentación completa: ARCHITECTURE, DEPLOYMENT, RECOVERY, OPERACION, SERVER_INFO
+- TV promo carousel: página fullscreen `promo.html` + API de gestión de imágenes
+- Gestión de imágenes desde pendrive: upload base64 → disco + DB, eliminación desde el POS
+
+---
+
+## Stack técnico (estado real)
+
+| Componente | Tecnología |
+|---|---|
+| OS | Ubuntu 26.04 LTS |
+| Backend | Node.js 20 + Express 5 + Socket.io 4 |
+| ORM | Prisma 5 sobre PostgreSQL 18 |
+| Frontend | React 18 con Babel in-browser (sin bundler en producción) |
+| Servidor web | Nginx — reverse proxy :80 → :3001, WebSocket habilitado |
+| Gestión procesos | systemd (cantina-api, nginx, postgresql@18-main) |
+| Administración | SSH + scripts bash |
+
+**Sin dependencias de internet en runtime:** React, ReactDOM, Babel, fuentes y librerías están en `/vendor/` y `/fonts/`.
+
+---
+
+## Servidores y URLs
+
+| Pantalla | URL | Dispositivo |
+|---|---|---|
+| POS principal | `http://192.168.100.54/` | PC caja / tablet admin |
+| Cocina | `http://192.168.100.54/cocina.html` | Pantalla cocina |
+| Autoservicio | `http://192.168.100.54/autoservicio.html` | Tablet clientes |
+| TV Promociones | `http://192.168.100.54/promo.html` | TV del salón |
+
+**Servidor:** `ssh cantina@192.168.100.54` — IP fija en la LAN.
+
+---
+
+## Archivos clave
+
+| Archivo | Descripción |
+|---|---|
+| `server.js` | Backend completo (~640 líneas, un solo archivo) |
+| `client/dist/index.html` | POS principal (~3600 líneas, React inline) |
+| `client/dist/cocina.html` | Vista cocina |
+| `client/dist/autoservicio.html` | Tablet autoservicio |
+| `client/dist/promo.html` | TV carrusel de promociones |
+| `prisma/schema.prisma` | Esquema DB (9 modelos) |
+| `scripts/` | Mantenimiento: healthcheck, backup, restart, dashboard |
+| `images/` | Imágenes del carrusel TV (servidas en `/images/`) |
+
+---
+
+## Modelos de base de datos
+
+```
+Usuario        → login por PIN, roles (caja, cocina, admin)
+Categoria      → agrupa productos, flag despacho_directo
+Producto       → precio, stock, stock_min, código de barras
+Cliente        → cuenta corriente (fiado)
+ClientePago    → historial de pagos
+Pedido         → tipo mesa/barra, estado, cobrado, método de pago
+PedidoItem     → líneas del pedido con precio capturado
+CierreCaja     → resumen de cierre diario
+CarouselImage  → imágenes para el TV del salón (filename, orden, activo)
+```
+
+**Estados de pedido:** `pendiente` → `en_preparacion` → `listo` → `entregado` / `cancelado`
+
+---
+
+## TV Promo Carousel
+
+- **Página:** `promo.html` — fullscreen, sin cursor, sin UI, diseñada para correr permanente en un TV
+- **Rotación:** cada 8 segundos con crossfade de 1.2s
+- **Polling:** consulta `/api/carousel` cada 30 segundos; si cambian las imágenes reconstruye el carrusel automáticamente
+- **API:** `POST /api/carousel` (sube imagen en base64, guarda en `/images/` + DB) · `DELETE /api/carousel/:id`
+- **Gestión:** desde la pestaña **Sistema** del POS → botón **📺 VER TV** para previsualizar · **📁 Abrir archivos** para seleccionar del pendrive · **📥 Importar todas**
+- **Almacenamiento:** `/home/cantina/cantina-pos/images/` (servido en `/images/` por Express)
+
+---
+
+## Diseño UI (Modern POS v2)
+
+El frontend fue rediseñado estructuralmente (no solo colores):
+
+- **Navegación:** bottom bar fija con 5 ítems (Venta / Pedidos / Mesas / Caja / ⋯Más) + drawer para pestañas secundarias
+- **Header:** 52px con logo, reloj, estado DB, badge de usuario, toggle de tema
+- **Venta:** tarjetas de producto con banda de color de categoría, grid de mesas 8 columnas, panel carrito 38%
+- **Pedidos:** agrupados por urgencia (LISTOS → EN COCINA → ENTREGADOS → COBRADOS → CANCELADOS)
+- **Numpad:** bottom sheet con botones de 68px
+- **Tema classic:** preservado intacto, seleccionable desde el toggle 🌙 — útil para debug o preferencia del operador
+- **Colores modern:** accent `#6366F1` (indigo), bg `#070A12`, surface `#0D1120`
+
+---
 
 ## Filosofía del proyecto
 
-Priorizar:
+**Priorizar:** estabilidad · simplicidad · recovery rápido · funcionamiento offline/LAN · mantenibilidad
 
-* estabilidad
-* simplicidad
-* claridad
-* recovery rápido
-* facilidad de soporte
-* funcionamiento offline/LAN
-* mantenibilidad a largo plazo
+**Evitar:** complejidad innecesaria · microservicios · dependencias cloud · reescrituras · arquitectura enterprise
 
-## Importante
+**Reglas:** analizar antes de cambiar · preservar funcionamiento existente · documentar todo · no agregar features no pedidas
 
-El sistema YA funciona.
-NO queremos una reescritura completa.
-Queremos profesionalizar, ordenar y estabilizar el sistema existente.
-
-## Objetivos técnicos
-
-* estructura más limpia
-* mejor organización
-* documentación completa
-* logs claros
-* scripts de backup y restore
-* autorestart de servicios
-* mejor debugging
-* mejor UX touchscreen
-* reducir errores operativos
-* mejorar mantenimiento
+---
 
 ## UX Goals
 
-El sistema será usado:
-
-* con tablets touchscreen
-* por usuarios no técnicos
-* en ambientes rápidos y con presión
-* posiblemente con mala iluminación
-* con necesidad de velocidad y claridad
-
-La interfaz debe priorizar:
-
-* botones grandes
-* pocos clicks
-* feedback visual claro
-* velocidad de operación
-* simplicidad extrema
-
-## Evitar
-
-* complejidad innecesaria
-* arquitectura enterprise
-* microservicios
-* dependencias cloud
-* reescrituras innecesarias
-* cambios riesgosos sin validación
-
-## Reglas de trabajo
-
-Antes de hacer cambios importantes:
-
-* analizar
-* explicar
-* validar
-* probar
-
-Siempre:
-
-* preservar funcionamiento existente
-* verificar que el sistema siga funcionando
-* ejecutar tests o validaciones
-* documentar cambios
+Usado por operadores no técnicos, en ambientes rápidos, con tablets touchscreen y posiblemente mala iluminación. La interfaz prioriza: botones grandes · pocos clicks · feedback visual inmediato · velocidad · simplicidad extrema.
