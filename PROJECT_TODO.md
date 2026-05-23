@@ -69,7 +69,7 @@
 * [x] Revisar flujo de cancelación — OK (fix doble cancelación en backend)
 * [x] Revisar flujo de cocina — fix cambiarEstado sin null check
 * [x] Revisar flujo de administración — OK
-* [ ] Crear documentación frontend
+* [x] Crear documentación frontend — docs actualizados con promo.html y carrusel TV
 
 ## PostgreSQL
 

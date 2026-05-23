@@ -19,6 +19,7 @@ Al entrar pide un PIN de 4 dígitos según el rol del usuario.
 | POS principal | `http://192.168.100.54/` | Cajero, admin, cocina |
 | Cocina | `http://192.168.100.54/cocina.html` | Cocineros |
 | Autoservicio | `http://192.168.100.54/autoservicio.html` | Clientes (tablet) |
+| TV Promociones | `http://192.168.100.54/promo.html` | TV del salón |
 
 ---
 
@@ -130,6 +131,33 @@ Si desde caja modificaron un pedido ya enviado, aparece un banner azul **✏️ 
 2. Elegir nombre, emoji y color
 3. Indicar si es de despacho directo (ej: bebidas)
 4. Tocar **💾 Guardar**
+
+---
+
+## Carrusel de promociones en TV
+
+La pantalla del TV muestra imágenes de promociones en carrusel automático.
+
+### Cargar imágenes desde el pendrive
+
+1. Conectar el pendrive con las fotos al servidor (o a la computadora)
+2. Ir al tab **Sistema** en el POS principal
+3. En la sección **Imágenes Carrusel**, tocar **📁 Abrir archivos**
+4. Seleccionar las imágenes desde el pendrive (JPG, PNG, WEBP)
+5. Las imágenes aparecen en la lista de "listas para importar"
+6. Tocar **↑** para importar una a la vez, o **📥 Importar todas** para todas
+7. Las imágenes quedan en la base de datos y aparecen automáticamente en el TV
+
+### Eliminar una imagen
+
+1. Ir al tab **Sistema**
+2. En la lista **EN TV**, tocar el botón **🗑** de la imagen a eliminar
+
+### El TV
+
+- El TV debe tener abierta la página `http://192.168.100.54/promo.html`
+- Las imágenes rotan automáticamente cada 8 segundos
+- Si se agregan o eliminan imágenes, el TV se actualiza en menos de 30 segundos
 
 ---
 

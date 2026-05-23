@@ -223,3 +223,14 @@ Ver guía específica en `KIOSK.md` (pendiente).
 2. El PIN por defecto del admin es el que se configuró en `seed.js`
 3. Ir a **Productos** para configurar el menú
 4. Ir a **Usuarios** para crear los usuarios del sistema
+
+## URLs disponibles tras la instalación
+
+| URL | Pantalla |
+|---|---|
+| `http://<IP>/` | POS principal — caja, cocina, admin |
+| `http://<IP>/cocina.html` | Vista cocina |
+| `http://<IP>/autoservicio.html` | Autoservicio para clientes |
+| `http://<IP>/promo.html` | TV del salón — carrusel de promociones |
+
+El TV del salón debe apuntar a `http://<IP>/promo.html`. Las imágenes se gestionan desde la pestaña **Sistema** del POS principal (botón **📁 Abrir archivos** → seleccionar imágenes del pendrive → **📥 Importar todas**).

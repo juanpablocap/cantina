@@ -14,7 +14,7 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '15mb' }));
 app.use('/images', express.static(path.join(__dirname, 'images')));
 
 // ============================================
@@ -503,6 +503,35 @@ app.get('/api/carousel', async (req, res) => {
   try {
     const imgs = await prisma.carouselImage.findMany({ where: { activo: true }, orderBy: { orden: 'asc' } });
     res.json(imgs);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/carousel', async (req, res) => {
+  try {
+    const { filename, data } = req.body;
+    if (!filename || !data) return res.status(400).json({ error: 'filename y data requeridos' });
+    const ext = path.extname(filename).toLowerCase();
+    const allowed = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+    if (!allowed.includes(ext)) return res.status(400).json({ error: 'Formato no permitido' });
+    const safeName = Date.now() + '_' + filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const imgPath = path.join(__dirname, 'images', safeName);
+    const base64Data = data.replace(/^data:image\/\w+;base64,/, '');
+    fs.writeFileSync(imgPath, Buffer.from(base64Data, 'base64'));
+    const maxOrden = await prisma.carouselImage.aggregate({ _max: { orden: true } });
+    const orden = (maxOrden._max.orden ?? -1) + 1;
+    const img = await prisma.carouselImage.create({ data: { filename: safeName, orden, activo: true } });
+    res.json(img);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/carousel/:id', async (req, res) => {
+  try {
+    const img = await prisma.carouselImage.findUnique({ where: { id: Number(req.params.id) } });
+    if (!img) return res.status(404).json({ error: 'No encontrado' });
+    const imgPath = path.join(__dirname, 'images', img.filename);
+    if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
+    await prisma.carouselImage.delete({ where: { id: img.id } });
+    res.json({ deleted: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 

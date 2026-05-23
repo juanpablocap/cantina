@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cantina — Promociones</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #000;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      font-family: system-ui, sans-serif;
+      cursor: none;
+    }
+
+    #carousel {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity 1.2s ease-in-out;
+      background: #000 center/cover no-repeat;
+    }
+
+    .slide.active {
+      opacity: 1;
+    }
+
+    #no-images {
+      display: none;
+      position: absolute;
+      inset: 0;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #333;
+      font-size: 18px;
+      gap: 16px;
+    }
+    #no-images.show { display: flex; }
+
+    #no-images .icon { font-size: 72px; opacity: 0.3; }
+    #no-images .text { opacity: 0.4; }
+
+    #dots {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 8px;
+      z-index: 10;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+      transition: background 0.3s, transform 0.3s;
+    }
+    .dot.active {
+      background: #fff;
+      transform: scale(1.25);
+    }
+
+    #status {
+      position: fixed;
+      top: 16px;
+      right: 20px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.15);
+      z-index: 10;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+
+<div id="carousel">
+  <div id="no-images" class="show">
+    <div class="icon">📸</div>
+    <div class="text">Sin imágenes — agregá fotos desde el panel Sistema</div>
+  </div>
+</div>
+
+<div id="dots"></div>
+<div id="status">cantina.tv</div>
+
+<script>
+  const SLIDE_DURATION = 8000;   // ms per slide
+  const POLL_INTERVAL  = 30000;  // ms to re-fetch images from server
+
+  let images   = [];
+  let current  = 0;
+  let slideTimer = null;
+
+  const carousel = document.getElementById('carousel');
+  const dotsEl   = document.getElementById('dots');
+  const noImages = document.getElementById('no-images');
+
+  function buildSlides() {
+    // Remove old slides but keep #no-images
+    carousel.querySelectorAll('.slide').forEach(s => s.remove());
+    dotsEl.innerHTML = '';
+
+    if (images.length === 0) {
+      noImages.classList.add('show');
+      return;
+    }
+    noImages.classList.remove('show');
+
+    images.forEach((img, i) => {
+      const slide = document.createElement('div');
+      slide.className = 'slide' + (i === current ? ' active' : '');
+      slide.style.backgroundImage = `url('/images/${img.filename}')`;
+      carousel.appendChild(slide);
+
+      const dot = document.createElement('div');
+      dot.className = 'dot' + (i === current ? ' active' : '');
+      dotsEl.appendChild(dot);
+    });
+  }
+
+  function goTo(index) {
+    const slides = carousel.querySelectorAll('.slide');
+    const dots   = dotsEl.querySelectorAll('.dot');
+    if (!slides.length) return;
+
+    slides[current]?.classList.remove('active');
+    dots[current]?.classList.remove('active');
+
+    current = (index + images.length) % images.length;
+
+    slides[current]?.classList.add('active');
+    dots[current]?.classList.add('active');
+  }
+
+  function startRotation() {
+    clearInterval(slideTimer);
+    if (images.length < 2) return;
+    slideTimer = setInterval(() => goTo(current + 1), SLIDE_DURATION);
+  }
+
+  async function fetchImages() {
+    try {
+      const res  = await fetch('/api/carousel');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+
+      const prev = JSON.stringify(images.map(i => i.id));
+      const next = JSON.stringify(data.map(i => i.id));
+
+      if (prev !== next) {
+        images  = data;
+        current = 0;
+        clearInterval(slideTimer);
+        buildSlides();
+        startRotation();
+      }
+    } catch (e) {
+      // server offline — keep showing what we have
+    }
+  }
+
+  // Start
+  fetchImages();
+  setInterval(fetchImages, POLL_INTERVAL);
+</script>
+</body>
+</html>

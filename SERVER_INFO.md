@@ -80,5 +80,16 @@ Nginx (ver: nginx -v)
 App principal:   http://192.168.100.54/
 Cocina:          http://192.168.100.54/cocina.html
 Autoservicio:    http://192.168.100.54/autoservicio.html
+TV Promociones:  http://192.168.100.54/promo.html
 API health:      http://192.168.100.54/api/health
 ```
+
+## TV Promociones (carrusel)
+
+La pantalla del TV debe abrir `http://192.168.100.54/promo.html` en modo pantalla completa.
+
+- Las imágenes se gestionan desde la pestaña **Sistema → Imágenes Carrusel** del POS principal
+- Se guardan en `/home/cantina/cantina-pos/images/`
+- La página del TV se actualiza automáticamente cada 30 segundos
+- Cada imagen se muestra durante 8 segundos con transición suave
+- Para configurar el TV: apuntarlo siempre a la IP `192.168.100.54` (IP fija del servidor)

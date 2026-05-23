@@ -19,6 +19,7 @@ Sistema de punto de venta para cantina. Corre 100% en red local (LAN), sin depen
 | `http://<IP>/` | POS principal — caja, cocina, admin, clientes, reportes |
 | `http://<IP>/cocina.html` | Vista cocina — pantalla grande, sin mouse |
 | `http://<IP>/autoservicio.html` | Autoservicio — tablets de clientes |
+| `http://<IP>/promo.html` | TV promociones — carrusel fullscreen para el salón |
 
 ## Documentación
 

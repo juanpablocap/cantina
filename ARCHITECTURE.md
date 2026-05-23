@@ -33,6 +33,7 @@ cantina-pos/
 │       ├── index.html         # App POS principal (caja, cocina, admin)
 │       ├── autoservicio.html  # Vista autoservicio para tablets clientes
 │       ├── cocina.html        # Vista simplificada para cocina
+│       ├── promo.html         # TV del salón — carrusel de imágenes promo
 │       ├── vendor/            # React, ReactDOM, Babel (offline, sin CDN)
 │       └── fonts/             # Fuentes tipográficas (offline, sin CDN)
 ├── scripts/
@@ -135,10 +136,12 @@ Un solo archivo Node.js con Express. Usa Prisma como ORM sobre PostgreSQL.
 
 > ⚠️ La cola de autoservicio es **en memoria** — se pierde si el backend se reinicia.
 
-**Otros**
-| Método | Ruta          | Descripción           |
-|--------|---------------|-----------------------|
-| GET    | /api/carousel | Imágenes del carrusel |
+**Carrusel TV**
+| Método | Ruta               | Descripción                                              |
+|--------|--------------------|----------------------------------------------------------|
+| GET    | /api/carousel      | Lista imágenes activas (usada por promo.html y el POS)   |
+| POST   | /api/carousel      | Sube imagen (base64 JSON), guarda en `/images/` y en DB  |
+| DELETE | /api/carousel/:id  | Elimina imagen del disco y de la DB                      |
 
 ### WebSocket (Socket.io)
 
@@ -177,13 +180,23 @@ CarouselImage   → imágenes para el carrusel de la pantalla de TV
 
 ## Frontend
 
-Tres vistas independientes en `client/dist/`:
+Cuatro vistas independientes en `client/dist/`:
 
-| Archivo             | Uso                                        |
-|---------------------|--------------------------------------------|
-| `index.html`        | POS principal: caja, cocina, admin, clientes, reportes |
-| `autoservicio.html` | Tablet de autoservicio para clientes       |
-| `cocina.html`       | Vista simplificada para la cocina          |
+| Archivo             | Uso                                                      |
+|---------------------|----------------------------------------------------------|
+| `index.html`        | POS principal: caja, cocina, admin, clientes, reportes   |
+| `autoservicio.html` | Tablet de autoservicio para clientes                     |
+| `cocina.html`       | Vista simplificada para la cocina                        |
+| `promo.html`        | TV del salón — carrusel fullscreen de imágenes promo     |
+
+### promo.html — TV Promociones
+
+Página sin UI (fullscreen, sin cursor) diseñada para correr en el TV del salón:
+- Consulta `GET /api/carousel` al cargar y cada 30 segundos
+- Rota imágenes con crossfade (1.2s) cada 8 segundos
+- Si la lista de imágenes cambia, reconstruye el carrusel automáticamente
+- Las imágenes se gestionan desde la pestaña **Sistema** del POS (botón 📁 + importar)
+- Los archivos se guardan en `/home/cantina/cantina-pos/images/`
 
 El frontend usa React con Babel en el browser (sin build step en producción). Las dependencias (React, ReactDOM, Babel, fuentes) están en `/vendor/` y `/fonts/` — **sin dependencias de internet**.
 
