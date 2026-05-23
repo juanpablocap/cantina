@@ -18,6 +18,7 @@
 * [x] Crear script restart_backend.sh
 * [x] Crear script restart_all.sh
 * [x] Crear script backup.sh
+* [x] Crear script backup_sistema.sh — backup completo con DB + proyecto + config nginx/systemd + RESTORE.md
 * [x] Crear script restore.sh
 * [x] Crear script healthcheck.sh
 * [x] Verificar recuperación tras reinicio del servidor — todos los servicios levantan solos
@@ -118,9 +119,9 @@
 * [x] Mostrar IP local — healthcheck.sh
 * [x] Mostrar uptime — healthcheck.sh
 * [x] Mostrar último backup — healthcheck.sh
-* [ ] Crear dashboard SSH/TUI interactivo con acciones rápidas
-* [ ] Agregar acciones restart rápidas desde dashboard
-* [ ] Agregar visualización rápida logs desde dashboard
+* [x] Crear dashboard SSH/TUI interactivo con acciones rápidas — scripts/dashboard.sh
+* [x] Agregar acciones restart rápidas desde dashboard
+* [x] Agregar visualización rápida logs desde dashboard
 
 ## Documentación Técnica
 

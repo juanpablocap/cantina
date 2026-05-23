@@ -49,6 +49,14 @@ window.__App = function CocinaDisplay() {
   const [pedidos, setPedidos] = useState([]);
   const [now, setNow] = useState(new Date());
   const [conectado, setConectado] = useState(true);
+  const [pedidosModificados, setPedidosModificados] = useState({});
+  const prevPedidosRef = useRef([]);
+
+  const hashItems = (items) =>
+    (items || [])
+      .map(i => `${i.producto_id || i.id}:${i.cantidad}`)
+      .sort()
+      .join('|');
 
   // Load pedidos from API
   const loadPedidos = useCallback(async () => {
@@ -56,6 +64,21 @@ window.__App = function CocinaDisplay() {
     setConectado(!!peds);
     if (peds) {
       const activos = peds.filter(p => ["pendiente", "en_preparacion", "listo"].includes(p.estado));
+      const prev = prevPedidosRef.current;
+      if (prev.length > 0) {
+        const nuevosModificados = {};
+        activos.forEach(newP => {
+          const oldP = prev.find(p => p.id === newP.id);
+          if (oldP && (
+            oldP.total !== newP.total ||
+            (oldP.items?.length ?? 0) !== (newP.items?.length ?? 0) ||
+            hashItems(oldP.items) !== hashItems(newP.items)
+          )) nuevosModificados[newP.id] = true;
+        });
+        if (Object.keys(nuevosModificados).length > 0)
+          setPedidosModificados(prev => ({ ...prev, ...nuevosModificados }));
+      }
+      prevPedidosRef.current = activos;
       setPedidos(activos);
     }
   }, []);
@@ -115,6 +138,8 @@ window.__App = function CocinaDisplay() {
         body { margin: 0; overflow: hidden; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
         @keyframes pulseCard { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,68,68,0); } 50% { box-shadow: 0 0 30px rgba(255,68,68,0.3); } }
+        @keyframes pulseBlue { 0%, 100% { background: #6C9BCF; } 50% { background: #4a7db5; } }
+        .mod-banner { animation: pulseBlue 1.2s ease-in-out infinite; }
       `}</style>
 
       {/* Header */}
@@ -164,6 +189,17 @@ window.__App = function CocinaDisplay() {
                     </div>
                     <Timer desde={p.createdAt} />
                   </div>
+
+                  {/* Banner modificado */}
+                  {pedidosModificados[p.id] && (
+                    <div className="mod-banner" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px" }}>
+                      <span style={{ fontSize: 22, fontWeight: 900, color: "#fff", letterSpacing: "0.04em" }}>✏️ PEDIDO MODIFICADO</span>
+                      <button onClick={(e) => { e.stopPropagation(); setPedidosModificados(prev => { const n = {...prev}; delete n[p.id]; return n; }); }}
+                        style={{ padding: "10px 20px", borderRadius: 10, border: "2px solid #fff", background: "transparent", color: "#fff", fontSize: 18, fontWeight: 900, cursor: "pointer" }}>
+                        ✓ VISTO
+                      </button>
+                    </div>
+                  )}
 
                   {/* Items */}
                   <div style={{ padding: "10px 18px" }}>

@@ -183,6 +183,29 @@ app.get('/api/categorias', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+app.post('/api/categorias', async (req, res) => {
+  try {
+    const { nombre, emoji, color, despacho_directo, orden } = req.body;
+    if (!nombre?.trim()) return res.status(400).json({ error: 'nombre requerido' });
+    const cat = await prisma.categoria.create({
+      data: { nombre: nombre.trim(), emoji: emoji || '📦', color: color || '#6B7080', despacho_directo: !!despacho_directo, orden: orden || 0 }
+    });
+    res.json(cat);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/categorias/:id', async (req, res) => {
+  try {
+    const { nombre, emoji, color, despacho_directo, orden } = req.body;
+    if (!nombre?.trim()) return res.status(400).json({ error: 'nombre requerido' });
+    const cat = await prisma.categoria.update({
+      where: { id: Number(req.params.id) },
+      data: { nombre: nombre.trim(), emoji, color, despacho_directo: !!despacho_directo, orden: orden ?? 0 }
+    });
+    res.json(cat);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ============================================
 // PRODUCTOS
 // ============================================
@@ -326,6 +349,57 @@ app.put('/api/pedidos/:id', async (req, res) => {
       data: { estado },
       include: { items: { include: { producto: true } } }
     });
+    io.emit('pedido-actualizado', pedido);
+    res.json(pedido);
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/pedidos/:id/items', async (req, res) => {
+  try {
+    const { items } = req.body;
+    if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'items requeridos' });
+    const pedidoId = Number(req.params.id);
+
+    const pedido = await prisma.$transaction(async tx => {
+      const current = await tx.pedidoItem.findMany({ where: { pedido_id: pedidoId } });
+
+      // Restaurar stock de ítems anteriores
+      for (const item of current) {
+        await tx.producto.update({ where: { id: item.producto_id }, data: { stock: { increment: item.cantidad } } });
+      }
+
+      // Borrar ítems anteriores
+      await tx.pedidoItem.deleteMany({ where: { pedido_id: pedidoId } });
+
+      // Calcular nuevo total
+      const total = items.reduce((s, i) => s + i.precio * i.cantidad, 0);
+
+      // Crear nuevos ítems y descontar stock
+      const updated = await tx.pedido.update({
+        where: { id: pedidoId },
+        data: {
+          total,
+          items: {
+            create: items.map(i => ({
+              producto_id: i.producto_id,
+              cantidad: i.cantidad,
+              precio: i.precio,
+              observaciones: i.observaciones || null,
+            }))
+          }
+        },
+        include: { items: { include: { producto: true } } }
+      });
+
+      for (const item of items) {
+        await tx.producto.update({ where: { id: item.producto_id }, data: { stock: { decrement: item.cantidad } } });
+      }
+
+      return updated;
+    });
+
     io.emit('pedido-actualizado', pedido);
     res.json(pedido);
   } catch(e) {

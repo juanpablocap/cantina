@@ -228,6 +228,9 @@ window.__App = function CantinaFull() {
   const [mesaFlash, setMesaFlash] = useState(false);
   const [cancelarPedido, setCancelarPedido] = useState(null);
   const [agregarItemPedido, setAgregarItemPedido] = useState(null);
+  const [editarPedido, setEditarPedido] = useState(null); // { id, numero, items: [...] }
+  const [pedidosActualizados, setPedidosActualizados] = useState(new Set());
+  const prevPedidosRef = useRef([]);
   const [descuento, setDescuento] = useState({ tipo: "none", valor: "" });
   const [mesaNotas, setMesaNotas] = useState({});
   const [mesaSeleccionada, setMesaSeleccionada] = useState(null);
@@ -237,6 +240,7 @@ window.__App = function CantinaFull() {
   const [touchNum, setTouchNum] = useState(null);
   const [userForm, setUserForm] = useState(null);
   const [productoForm, setProductoForm] = useState(null); // { mode, id?, nombre, precio, stock, cat_id, cocina }
+  const [categoriaForm, setCategoriaForm] = useState(null); // { mode, id?, nombre, emoji, color, despacho_directo }
   const [pedidosAutoservicio, setPedidosAutoservicio] = useState([]);
   const [autoNotifExpanded, setAutoNotifExpanded] = useState(null);
   const [carouselImages, setCarouselImages] = useState([]);
@@ -291,7 +295,28 @@ window.__App = function CantinaFull() {
         apiFetch('/clientes'),
         apiFetch('/productos'),
       ]);
-      if (peds && Array.isArray(peds)) setPedidos(peds);
+      if (peds && Array.isArray(peds)) {
+        const prev = prevPedidosRef.current;
+        if (prev.length > 0) {
+          const changed = new Set();
+          peds.forEach(newP => {
+            const oldP = prev.find(p => p.id === newP.id);
+            if (oldP && (
+              oldP.estado !== newP.estado ||
+              oldP.total !== newP.total ||
+              (oldP.items?.length ?? 0) !== (newP.items?.length ?? 0)
+            )) changed.add(newP.id);
+          });
+          if (changed.size > 0) {
+            setPedidosActualizados(prev => new Set([...prev, ...changed]));
+            setTimeout(() => setPedidosActualizados(prev => {
+              const next = new Set(prev); changed.forEach(id => next.delete(id)); return next;
+            }), 10000);
+          }
+        }
+        prevPedidosRef.current = peds;
+        setPedidos(peds);
+      }
       if (clients && Array.isArray(clients) && clients.length > 0) setClientes(clients);
       if (prods && Array.isArray(prods) && prods.length > 0) setProductos(prods);
     }, 5000);
@@ -701,7 +726,7 @@ window.__App = function CantinaFull() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: S.bg, fontFamily: "'DM Sans', -apple-system, sans-serif", color: S.text, display: "flex", flexDirection: "column" }}>
+    <div style={{ height: "100vh", background: S.bg, fontFamily: "'DM Sans', -apple-system, sans-serif", color: S.text, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <style>{`
         @import url('/fonts/dm-jb.css');
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -719,6 +744,8 @@ window.__App = function CantinaFull() {
         @keyframes flashField { 0%, 100% { box-shadow: none; } 25% { box-shadow: 0 0 0 3px ${S.danger}; } 50% { box-shadow: none; } 75% { box-shadow: 0 0 0 3px ${S.danger}; } }
         .flash-field { animation: flashField 1.5s ease-out; }
         @keyframes pulseNotif { 0%, 100% { box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 0 0 rgba(255,184,51,0); } 50% { box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 0 4px rgba(255,184,51,0.3); } }
+        @keyframes pulseBlue { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .pulse-blue { animation: pulseBlue 1.4s ease-in-out infinite; }
       `}</style>
 
       {/* ===== TOP BAR ===== */}
@@ -1072,7 +1099,10 @@ window.__App = function CantinaFull() {
                     {/* Actions */}
                     <div style={{ padding: "10px 20px 16px" }}>
                       {isPendiente && (
-                        <button onClick={() => setPedidos(prev => prev.map(x => x.id === p.id ? { ...x, estado: "en_preparacion" } : x))} style={{
+                        <button onClick={async () => {
+                          const result = await apiFetch(`/pedidos/${p.id}`, { method: 'PUT', body: { estado: 'en_preparacion' } });
+                          if (result) setPedidos(prev => prev.map(x => x.id === p.id ? { ...x, estado: 'en_preparacion' } : x));
+                        }} style={{
                           width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
                           background: `linear-gradient(135deg, ${S.warning}, #FF9500)`, color: "#000",
                           fontSize: 16, fontWeight: 900, cursor: "pointer", letterSpacing: "0.02em",
@@ -1265,14 +1295,19 @@ window.__App = function CantinaFull() {
               {pedidos.map(p => {
                 const estadoColor = p.estado === "pendiente" ? S.danger : p.estado === "en_preparacion" ? S.warning : p.estado === "listo" ? S.success : S.muted;
                 return (
-                  <div key={p.id} className="anim-in" style={{ padding: 16, borderRadius: 14, background: S.surface, border: `2px solid ${S.border}` }}>
+                  <div key={p.id} className="anim-in"
+                    onClick={() => pedidosActualizados.has(p.id) && setPedidosActualizados(prev => { const n = new Set(prev); n.delete(p.id); return n; })}
+                    style={{ padding: 16, borderRadius: 14, background: S.surface, border: `2px solid ${pedidosActualizados.has(p.id) ? S.info : S.border}`, transition: "border-color 0.3s", cursor: "default" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                         <span style={{ fontWeight: 900, fontSize: 16 }}>#{String(p.numero).padStart(3, "0")}</span>
                         {p.nombre_cliente && (
                           <span style={{ fontSize: 13, fontWeight: 700, color: S.info }}>📢 {p.nombre_cliente}</span>
                         )}
                         {p.solo_despacho && <span style={{ fontSize: 10, fontWeight: 900, padding: "2px 8px", borderRadius: 6, background: S.success + "25", color: S.success }}>Directa</span>}
+                        {pedidosActualizados.has(p.id) && (
+                          <span className="pulse-blue" style={{ fontSize: 10, fontWeight: 900, padding: "2px 8px", borderRadius: 6, background: S.info, color: "#fff" }}>● actualizado</span>
+                        )}
                       </div>
                       <span style={{ fontSize: 10, fontWeight: 800, padding: "4px 10px", borderRadius: 8, color: "#fff", background: estadoColor }}>
                         {p.estado.replace("_", " ").toUpperCase()}
@@ -1302,8 +1337,8 @@ window.__App = function CantinaFull() {
                         {!p.cobrado && p.estado !== "cancelado" && (
                           <button onClick={() => setPinModal({ action: "cancelar", pedidoId: p.id, pin: "" })} style={{ padding: "6px 10px", borderRadius: 8, border: "none", background: S.danger + "18", color: S.danger, fontSize: 10, fontWeight: 800, cursor: "pointer" }}>❌</button>
                         )}
-                        {!p.cobrado && p.estado !== "cancelado" && ["pendiente", "en_preparacion", "entregado"].includes(p.estado) && (
-                          <button onClick={() => setAgregarItemPedido(p.id)} style={{ padding: "6px 10px", borderRadius: 8, border: `1px solid ${S.border}`, background: S.bg, color: S.text, fontSize: 10, fontWeight: 800, cursor: "pointer" }}>+ Item</button>
+                        {!p.cobrado && ["pendiente", "en_preparacion", "listo"].includes(p.estado) && (
+                          <button onClick={() => setEditarPedido({ id: p.id, numero: p.numero, items: p.items.map(i => ({ ...i })) })} style={{ padding: "6px 10px", borderRadius: 8, border: `1px solid ${S.border}`, background: S.bg, color: S.text, fontSize: 10, fontWeight: 800, cursor: "pointer" }}>✏️</button>
                         )}
                         {p.estado === "listo" && (
                           <button onClick={() => marcarEntregado(p.id)} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: S.success, color: "#000", fontSize: 11, fontWeight: 800, cursor: "pointer" }}>✅ Entregado</button>
@@ -1592,12 +1627,106 @@ window.__App = function CantinaFull() {
               <span style={{ fontSize: 11, color: S.danger, fontWeight: 700 }}>
                 ⚠️ {productos.filter(p => p.stock <= p.stock_min).length} con stock bajo
               </span>
-              <button onClick={() => setProductoForm({ mode: "nuevo", nombre: "", precio: "", stock: "20", cat_id: categorias[0]?.id || 1, cocina: true })} style={{
+              <button onClick={() => { setProductoForm(null); setCategoriaForm({ mode: "nuevo", nombre: "", emoji: "📦", color: "#6B7080", despacho_directo: false }); }} style={{
+                padding: "8px 16px", borderRadius: 8, border: `2px solid ${S.border}`, background: "transparent", color: S.text,
+                fontSize: 12, fontWeight: 800, cursor: "pointer",
+              }}>+ Nueva Categoría</button>
+              <button onClick={() => { setCategoriaForm(null); setProductoForm({ mode: "nuevo", nombre: "", precio: "", stock: "20", cat_id: categorias[0]?.id || 1, cocina: true }); }} style={{
                 padding: "8px 16px", borderRadius: 8, border: "none", background: S.accent, color: "#fff",
                 fontSize: 12, fontWeight: 800, cursor: "pointer",
               }}>+ Nuevo Producto</button>
             </div>
           </div>
+
+          {/* Category form */}
+          {categoriaForm && (() => {
+            const COLORES = ["#E07A5F","#6C9BCF","#C4956A","#D4A5D0","#81B29A","#F2CC8F","#E07AB2","#7BC67E","#FF8C42","#9B72CF","#5AB4BD","#E55C5C"];
+            const EMOJIS  = ["📦","🍽️","🍺","☕","🍰","🥗","🍕","🥤","🍔","🥩","🍜","🍟","🧃","🥪","🍿","🧁","🌮","🥘","🫖","🍦","🥐","🍱","🍣","🥩","🫙"];
+            return (
+            <div style={{ marginBottom: 16, padding: 16, borderRadius: 14, background: S.surface, border: `2px solid ${S.border}` }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: S.muted, marginBottom: 10 }}>
+                {categoriaForm.mode === "nuevo" ? "➕ NUEVA CATEGORÍA" : "✏️ EDITAR CATEGORÍA"}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {/* Nombre */}
+                <div style={{ gridColumn: "span 2" }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: S.muted, marginBottom: 3 }}>Nombre</div>
+                  <button onClick={() => setTouchKb({ field: "categoriaForm_nombre", title: "NOMBRE DE LA CATEGORÍA", value: categoriaForm.nombre })}
+                    style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: `2px solid ${categoriaForm.nombre ? S.accent : S.border}`, background: S.bg, color: categoriaForm.nombre ? S.text : S.muted, fontSize: 13, textAlign: "left", cursor: "pointer" }}>
+                    {categoriaForm.nombre || "Tocar para escribir"}
+                  </button>
+                </div>
+                {/* Emoji */}
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: S.muted, marginBottom: 3 }}>Emoji</div>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                    {EMOJIS.map(e => (
+                      <button key={e} onClick={() => setCategoriaForm(prev => ({ ...prev, emoji: e }))} style={{
+                        width: 34, height: 34, borderRadius: 8, border: `2px solid ${categoriaForm.emoji === e ? S.accent : S.border}`,
+                        background: categoriaForm.emoji === e ? S.accent + "30" : "transparent",
+                        fontSize: 16, cursor: "pointer",
+                      }}>{e}</button>
+                    ))}
+                  </div>
+                </div>
+                {/* Color */}
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: S.muted, marginBottom: 3 }}>Color</div>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                    {COLORES.map(c => (
+                      <button key={c} onClick={() => setCategoriaForm(prev => ({ ...prev, color: c }))} style={{
+                        width: 34, height: 34, borderRadius: 8, border: `3px solid ${categoriaForm.color === c ? "#fff" : "transparent"}`,
+                        background: c, cursor: "pointer", boxShadow: categoriaForm.color === c ? `0 0 0 2px ${c}` : "none",
+                      }} />
+                    ))}
+                  </div>
+                </div>
+                {/* Despacho directo */}
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: S.muted, marginBottom: 3 }}>Despacho directo (sin cocina)</div>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <button onClick={() => setCategoriaForm(prev => ({ ...prev, despacho_directo: false }))} style={{
+                      flex: 1, padding: "6px 0", borderRadius: 6, border: `2px solid ${!categoriaForm.despacho_directo ? S.warning : S.border}`,
+                      background: !categoriaForm.despacho_directo ? S.warning : "transparent", color: !categoriaForm.despacho_directo ? "#000" : S.text,
+                      fontSize: 10, fontWeight: 800, cursor: "pointer",
+                    }}>🔥 Va a cocina</button>
+                    <button onClick={() => setCategoriaForm(prev => ({ ...prev, despacho_directo: true }))} style={{
+                      flex: 1, padding: "6px 0", borderRadius: 6, border: `2px solid ${categoriaForm.despacho_directo ? S.success : S.border}`,
+                      background: categoriaForm.despacho_directo ? S.success : "transparent", color: categoriaForm.despacho_directo ? "#000" : S.text,
+                      fontSize: 10, fontWeight: 800, cursor: "pointer",
+                    }}>⚡ Directo</button>
+                  </div>
+                </div>
+                {/* Preview */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: S.muted, marginBottom: 3 }}>Vista previa</div>
+                  <div style={{ padding: "6px 14px", borderRadius: 10, background: categoriaForm.color, color: "#fff", fontSize: 13, fontWeight: 800 }}>
+                    {categoriaForm.emoji} {categoriaForm.nombre || "Categoría"}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                <button onClick={async () => {
+                  if (!categoriaForm.nombre.trim()) return;
+                  if (categoriaForm.mode === "nuevo") {
+                    const result = await apiFetch('/categorias', { method: 'POST', body: { nombre: categoriaForm.nombre, emoji: categoriaForm.emoji, color: categoriaForm.color, despacho_directo: categoriaForm.despacho_directo } });
+                    if (result) { setCategorias(prev => [...prev, result]); showMsg("✅ Categoría creada"); }
+                  } else {
+                    const result = await apiFetch(`/categorias/${categoriaForm.id}`, { method: 'PUT', body: { nombre: categoriaForm.nombre, emoji: categoriaForm.emoji, color: categoriaForm.color, despacho_directo: categoriaForm.despacho_directo, orden: categoriaForm.orden || 0 } });
+                    if (result) { setCategorias(prev => prev.map(c => c.id === categoriaForm.id ? result : c)); showMsg("✅ Categoría actualizada"); }
+                  }
+                  setCategoriaForm(null);
+                }} disabled={!categoriaForm.nombre.trim()} style={{
+                  padding: "8px 20px", borderRadius: 8, border: "none",
+                  background: categoriaForm.nombre.trim() ? S.success : S.border,
+                  color: categoriaForm.nombre.trim() ? "#000" : S.muted,
+                  fontSize: 12, fontWeight: 800, cursor: categoriaForm.nombre.trim() ? "pointer" : "not-allowed",
+                }}>💾 Guardar</button>
+                <button onClick={() => setCategoriaForm(null)} style={{ padding: "8px 20px", borderRadius: 8, border: `1px solid ${S.border}`, background: "transparent", color: S.muted, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Cancelar</button>
+              </div>
+            </div>
+            );
+          })()}
 
           {/* Product form */}
           {productoForm && (
@@ -1703,6 +1832,10 @@ window.__App = function CantinaFull() {
                   <div style={{ fontSize: 12, fontWeight: 800, color: cat.color, marginBottom: 8, marginTop: 8, display: "flex", alignItems: "center", gap: 6 }}>
                     {cat.emoji} {cat.nombre}
                     {cat.despacho_directo && <span style={{ fontSize: 9, fontWeight: 900, color: S.success, padding: "2px 6px", borderRadius: 4, background: S.success + "15" }}>DESPACHO DIRECTO</span>}
+                    <button onClick={() => { setProductoForm(null); setCategoriaForm({ mode: "editar", id: cat.id, nombre: cat.nombre, emoji: cat.emoji || "📦", color: cat.color || "#6B7080", despacho_directo: cat.despacho_directo, orden: cat.orden }); window.scrollTo({ top: 0, behavior: "smooth" }); }} style={{
+                      marginLeft: 4, padding: "2px 8px", borderRadius: 6, border: `1px solid ${S.border}`, background: "transparent",
+                      color: S.muted, fontSize: 10, fontWeight: 700, cursor: "pointer",
+                    }}>✏️ editar</button>
                   </div>
                   {prods.map(p => {
                     const stockBajo = p.stock <= p.stock_min;
@@ -2271,6 +2404,118 @@ window.__App = function CantinaFull() {
       {/* ========================================= */}
       {/* MODAL: AGREGAR ITEM A PEDIDO */}
       {/* ========================================= */}
+      {/* ── Modal editar pedido ─────────────────────────── */}
+      {editarPedido && (() => {
+        const totalEdit = editarPedido.items.reduce((s, i) => s + i.precio * i.cantidad, 0);
+        const cambiarCantidad = (producto_id, delta) => setEditarPedido(prev => {
+          const items = prev.items.map(i => i.producto_id === producto_id ? { ...i, cantidad: i.cantidad + delta } : i).filter(i => i.cantidad > 0);
+          return { ...prev, items };
+        });
+        const agregarProducto = (p) => {
+          const cat = p.categoria || getCat(p.cat_id);
+          setEditarPedido(prev => {
+            const existe = prev.items.find(i => i.producto_id === p.id);
+            const items = existe
+              ? prev.items.map(i => i.producto_id === p.id ? { ...i, cantidad: i.cantidad + 1 } : i)
+              : [...prev.items, { producto_id: p.id, nombre: p.nombre, precio: p.precio, cantidad: 1, observaciones: "", cat_id: p.cat_id, despacho_directo: p.cocina ? false : cat.despacho_directo, sin_obs: p.sin_obs || false }];
+            return { ...prev, items };
+          });
+        };
+        return (
+          <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.8)" }}
+            onClick={() => setEditarPedido(null)}>
+            <div className="anim-in" style={{ width: "100%", maxWidth: 520, maxHeight: "90vh", display: "flex", flexDirection: "column", borderRadius: 20, background: S.surface, border: `2px solid ${S.accent}`, overflow: "hidden" }}
+              onClick={e => e.stopPropagation()}>
+
+              {/* Header */}
+              <div style={{ padding: "16px 20px", borderBottom: `1px solid ${S.border}`, flexShrink: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 900 }}>✏️ Editar pedido #{String(editarPedido.numero).padStart(3, "0")}</div>
+                <div style={{ fontSize: 11, color: S.muted, marginTop: 2 }}>Modificá los ítems antes de la entrega</div>
+              </div>
+
+              <div style={{ flex: 1, overflowY: "auto", padding: "12px 20px" }}>
+                {/* Ítems actuales */}
+                <div style={{ fontSize: 10, fontWeight: 800, color: S.muted, letterSpacing: "0.08em", marginBottom: 8 }}>ÍTEMS DEL PEDIDO</div>
+                {editarPedido.items.length === 0 ? (
+                  <div style={{ padding: "12px 0", color: S.danger, fontSize: 12, fontWeight: 700 }}>⚠️ Sin ítems — el pedido quedará vacío</div>
+                ) : (
+                  editarPedido.items.map(item => {
+                    const cat = getCat(item.cat_id);
+                    return (
+                      <div key={item.producto_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: `1px solid ${S.border}` }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700 }}>{item.nombre}</div>
+                          {item.observaciones && <div style={{ fontSize: 10, color: S.warning, fontWeight: 600 }}>{item.observaciones}</div>}
+                          <div style={{ fontSize: 12, color: cat.color, fontWeight: 800 }}>${(item.precio * item.cantidad).toLocaleString()}</div>
+                        </div>
+                        <button onClick={() => cambiarCantidad(item.producto_id, -1)} style={{ width: 34, height: 34, borderRadius: 8, border: `1px solid ${S.border}`, background: S.bg, color: S.text, fontWeight: 900, cursor: "pointer", fontSize: 18, flexShrink: 0 }}>−</button>
+                        <span style={{ fontWeight: 900, fontSize: 16, width: 28, textAlign: "center", flexShrink: 0 }}>{item.cantidad}</span>
+                        <button onClick={() => cambiarCantidad(item.producto_id, 1)} style={{ width: 34, height: 34, borderRadius: 8, border: `1px solid ${S.border}`, background: S.bg, color: S.text, fontWeight: 900, cursor: "pointer", fontSize: 18, flexShrink: 0 }}>+</button>
+                        <button onClick={() => setEditarPedido(prev => ({ ...prev, items: prev.items.filter(i => i.producto_id !== item.producto_id) }))} style={{ width: 34, height: 34, borderRadius: 8, border: "none", background: S.danger + "18", color: S.danger, cursor: "pointer", fontSize: 15, flexShrink: 0 }}>🗑</button>
+                      </div>
+                    );
+                  })
+                )}
+
+                {/* Agregar productos */}
+                <div style={{ fontSize: 10, fontWeight: 800, color: S.muted, letterSpacing: "0.08em", margin: "16px 0 8px" }}>AGREGAR PRODUCTO</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 6 }}>
+                  {productos.filter(p => p.stock > 0).map(p => {
+                    const cat = p.categoria || getCat(p.cat_id);
+                    const enPedido = editarPedido.items.find(i => i.producto_id === p.id);
+                    return (
+                      <button key={p.id} onClick={() => agregarProducto(p)} style={{
+                        padding: 10, borderRadius: 10, border: `2px solid ${enPedido ? cat.color : S.border}`,
+                        background: enPedido ? cat.color + "18" : S.bg, textAlign: "left", cursor: "pointer", position: "relative",
+                      }}>
+                        {enPedido && <span style={{ position: "absolute", top: 4, right: 4, width: 20, height: 20, borderRadius: "50%", background: cat.color, color: "#fff", fontSize: 10, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>{enPedido.cantidad}</span>}
+                        <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 2 }}>{p.nombre}</div>
+                        <div style={{ fontSize: 13, fontWeight: 900, color: cat.color }}>${p.precio.toLocaleString()}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div style={{ padding: "14px 20px", borderTop: `2px solid ${S.border}`, flexShrink: 0, background: S.surface }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <span style={{ fontSize: 13, color: S.muted, fontWeight: 600 }}>TOTAL</span>
+                  <span style={{ fontSize: 22, fontWeight: 900 }}>${totalEdit.toLocaleString()}</span>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={async () => {
+                    if (editarPedido.items.length === 0) return;
+                    const result = await apiFetch(`/pedidos/${editarPedido.id}/items`, {
+                      method: 'PUT',
+                      body: { items: editarPedido.items.map(i => ({ producto_id: i.producto_id, cantidad: i.cantidad, precio: i.precio, observaciones: i.observaciones || "" })) }
+                    });
+                    if (result) {
+                      setPedidos(prev => prev.map(p => p.id === editarPedido.id ? result : p));
+                      setProductos(prev => prev.map(p => {
+                        const item = result.items.find(i => i.producto_id === p.id);
+                        return item ? { ...p, stock: p.stock } : p;
+                      }));
+                      showMsg(`✅ Pedido #${String(editarPedido.numero).padStart(3,"0")} actualizado`);
+                      setEditarPedido(null);
+                    }
+                  }} disabled={editarPedido.items.length === 0} style={{
+                    flex: 1, padding: "12px 0", borderRadius: 12, border: "none",
+                    background: editarPedido.items.length > 0 ? S.success : S.border,
+                    color: editarPedido.items.length > 0 ? "#000" : S.muted,
+                    fontSize: 14, fontWeight: 900, cursor: editarPedido.items.length > 0 ? "pointer" : "not-allowed",
+                  }}>💾 Guardar cambios</button>
+                  <button onClick={() => setEditarPedido(null)} style={{
+                    padding: "12px 20px", borderRadius: 12, border: `1px solid ${S.border}`,
+                    background: "transparent", color: S.muted, fontSize: 13, fontWeight: 700, cursor: "pointer",
+                  }}>Cancelar</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {agregarItemPedido && (() => {
         const ped = pedidos.find(p => p.id === agregarItemPedido);
         if (!ped) return null;
@@ -2755,6 +3000,7 @@ window.__App = function CantinaFull() {
             else if (touchKb.field.startsWith("clienteForm_")) setClienteForm(prev => ({ ...prev, [touchKb.field.split("_")[1]]: v }));
             else if (touchKb.field.startsWith("userForm_")) setUserForm(prev => prev ? ({ ...prev, [touchKb.field.split("_")[1]]: v }) : null);
             else if (touchKb.field.startsWith("productoForm_")) setProductoForm(prev => prev ? ({ ...prev, [touchKb.field.split("_")[1]]: v }) : null);
+            else if (touchKb.field === "categoriaForm_nombre") setCategoriaForm(prev => prev ? ({ ...prev, nombre: v }) : null);
             setTouchKb(null);
           }}
           onCancel={() => {
@@ -2765,6 +3011,7 @@ window.__App = function CantinaFull() {
             else if (touchKb.field.startsWith("clienteForm_")) setClienteForm(prev => ({ ...prev, [touchKb.field.split("_")[1]]: v }));
             else if (touchKb.field.startsWith("userForm_")) setUserForm(prev => prev ? ({ ...prev, [touchKb.field.split("_")[1]]: v }) : null);
             else if (touchKb.field.startsWith("productoForm_")) setProductoForm(prev => prev ? ({ ...prev, [touchKb.field.split("_")[1]]: v }) : null);
+            else if (touchKb.field === "categoriaForm_nombre") setCategoriaForm(prev => prev ? ({ ...prev, nombre: v }) : null);
             setTouchKb(null);
           }}
           S={S}
