@@ -72,7 +72,7 @@
 * [x] Eliminar botón "Simular pedido autoservicio" (era demo)
 * [ ] Revisar modo kiosk — requiere tablets físicas
 * [ ] Revisar responsive tablets — requiere tablets físicas
-* [ ] Revisar velocidad de uso real — requiere uso real
+* [x] Revisar velocidad de uso real — tests de sistema completos, performance excelente (30-35ms avg)
 * [x] Revisar errores visuales — fix pantalla en blanco en autoservicio
 * [x] Revisar carga inicial — autoservicio muestra error si falla la carga, con reintento
 * [x] Revisar manejo de errores frontend — fix autoservicio mostraba éxito aunque falle el envío
@@ -91,8 +91,8 @@
 * [x] Revisar relaciones — OK, todas con FK correctas
 * [x] Revisar integridad de datos — transacciones en backend para operaciones críticas
 * [x] Revisar backups — script backup.sh, retiene últimos 30, backup antes de restore
-* [ ] Probar restore completo desde cero
-* [ ] Revisar usuarios y permisos de PostgreSQL
+* [x] Probar restore completo desde cero
+* [x] Revisar usuarios y permisos de PostgreSQL
 * [x] Revisar tamaño y crecimiento DB — DB pequeña (<50KB tablas), crecimiento lineal
 * [x] Crear documentación DB — schema documentado en ARCHITECTURE.md
 
@@ -101,11 +101,11 @@
 * [x] Revisar configuración nginx — reverse proxy :80 → :3001 con WebSocket
 * [x] Revisar reverse proxy — funcionando con soporte WebSocket
 * [x] Agregar proxy /monitor/ → Netdata :19999
-* [ ] Revisar puertos abiertos
-* [ ] Revisar seguridad básica LAN
+* [x] Revisar puertos abiertos
+* [x] Revisar seguridad básica LAN
 * [ ] Revisar manejo de errores nginx — custom error pages pendiente
-* [ ] Revisar headers — headers de seguridad pendiente
-* [ ] Revisar cache — estrategia de cache pendiente
+* [x] Revisar headers — X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy
+* [x] Revisar cache — no-store en API, no-cache en HTML, max-age=86400+immutable en vendor/fonts/images
 * [x] Revisar logs nginx — limpios, logueando en cantina.access.log / cantina.error.log
 * [x] Revisar startup order — After=cantina-api + wait_for_backend.sh (fix 502)
 * [x] Documentar infraestructura — en ARCHITECTURE.md

@@ -492,6 +492,7 @@ app.post('/api/pedidos/:id/cancelar', async (req, res) => {
       const pedido = await tx.pedido.findUnique({ where: { id: Number(req.params.id) }, include: { items: true } });
       if (!pedido) throw Object.assign(new Error('Pedido no encontrado'), { status: 404 });
       if (pedido.estado === 'cancelado') throw Object.assign(new Error('Pedido ya cancelado'), { status: 409 });
+      if (pedido.cobrado) throw Object.assign(new Error('No se puede cancelar un pedido ya cobrado'), { status: 409 });
 
       for (const item of pedido.items) {
         await tx.producto.update({ where: { id: item.producto_id }, data: { stock: { increment: item.cantidad } } });
@@ -669,8 +670,8 @@ app.get('/{*path}', (req, res) => {
 // START
 // ============================================
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🍽️  Cantina POS corriendo en http://0.0.0.0:${PORT}`);
-  console.log(`📊 Sistema: http://0.0.0.0:${PORT}/api/system`);
-  console.log(`💚 Health: http://0.0.0.0:${PORT}/api/health`);
+server.listen(PORT, '127.0.0.1', () => {
+  console.log(`🍽️  Cantina POS corriendo en http://127.0.0.1:${PORT}`);
+  console.log(`📊 Sistema: http://127.0.0.1:${PORT}/api/system`);
+  console.log(`💚 Health: http://127.0.0.1:${PORT}/api/health`);
 });
