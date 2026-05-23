@@ -10,6 +10,7 @@
 <div id="root"></div>
 <script src="/vendor/react.production.min.js"></script>
 <script src="/vendor/react-dom.production.min.js"></script>
+<script src="/vendor/chart.umd.min.js"></script>
 <script src="/vendor/babel.min.js"></script>
 <script type="text/babel" data-presets="react">
 const {useState, useEffect, useCallback, useRef} = React;
@@ -86,6 +87,64 @@ const THEMES = {
 };
 
 // ========================================
+// ========================================
+// SYSCHART — sparkline con Chart.js
+// ========================================
+function SysChart({ data, color, maxY, label, unit, current }) {
+  const canvasRef = useRef(null);
+  const chartRef  = useRef(null);
+
+  useEffect(() => {
+    if (!canvasRef.current || typeof Chart === 'undefined') return;
+    if (chartRef.current) {
+      chartRef.current.data.labels = data.map(() => '');
+      chartRef.current.data.datasets[0].data = data;
+      chartRef.current.update('none');
+      return;
+    }
+    chartRef.current = new Chart(canvasRef.current, {
+      type: 'line',
+      data: {
+        labels: data.map(() => ''),
+        datasets: [{
+          data,
+          borderColor: color,
+          backgroundColor: color + '28',
+          fill: true,
+          tension: 0.4,
+          pointRadius: 0,
+          borderWidth: 2,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 0 },
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        scales: {
+          x: { display: false },
+          y: { display: false, min: 0, max: maxY || 100, suggestedMax: maxY || 100 },
+        },
+      },
+    });
+    return () => { if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; } };
+  }, []);
+
+  useEffect(() => {
+    if (!chartRef.current) return;
+    chartRef.current.data.labels = data.map(() => '');
+    chartRef.current.data.datasets[0].data = data;
+    chartRef.current.options.scales.y.max = maxY || Math.max(100, ...data) * 1.2 || 100;
+    chartRef.current.update('none');
+  }, [data, maxY]);
+
+  return (
+    React.createElement('div', { style: { position: 'relative', width: '100%', height: '100%' } },
+      React.createElement('canvas', { ref: canvasRef })
+    )
+  );
+}
+
 // TOUCH KEYBOARD MODAL
 // ========================================
 const KB_ROWS_UPPER = [["1","2","3","4","5","6","7","8","9","0"],["Q","W","E","R","T","Y","U","I","O","P"],["A","S","D","F","G","H","J","K","L","Ñ"],["⇧","Z","X","C","V","B","N","M","⌫"]];
@@ -360,15 +419,25 @@ window.__App = function CantinaFull() {
   // Poll system data every 5s for dashboard + history for charts
   useEffect(() => {
     if (!loggedIn || !dataLoaded) return;
+    // Load existing history from server on mount
+    apiFetch('/system/history').then(hist => {
+      if (hist && hist.length) setSysHistory(hist);
+    });
     const fetchSys = async () => {
       const data = await apiFetch('/system');
       setConectado(!!data);
       if (data) {
         setSysData(data);
         setSysHistory(prev => {
-          const entry = { t: Date.now(), cpu: data.cpu, ram: data.ram?.total > 0 ? Math.round(data.ram.used / data.ram.total * 100) : 0, disk: data.disk?.pct || 0 };
-          const hist = [...prev, entry];
-          return hist.slice(-240); // Keep ~20min at 5s intervals
+          const entry = {
+            t: Date.now(),
+            cpu: data.cpu,
+            ram: data.ram?.total > 0 ? Math.round(data.ram.used / data.ram.total * 100) : 0,
+            disk: data.disk?.pct || 0,
+            rx: Math.max(0, data.net?.rx_kbps || 0),
+            tx: Math.max(0, data.net?.tx_kbps || 0),
+          };
+          return [...prev, entry].slice(-240);
         });
       }
     };
@@ -2909,7 +2978,12 @@ window.__App = function CantinaFull() {
         const printerOk = sysData?.services?.printer ?? false;
         const scannerOk = sysData?.services?.scanner ?? false;
         const lastBackup = sysData?.lastBackup || null;
+        const netRx = sysData?.net?.rx_kbps || 0;
+        const netTx = sysData?.net?.tx_kbps || 0;
+        const netIface = sysData?.net?.iface || 'eth0';
+        const fmtNet = v => v >= 1024 ? (v/1024).toFixed(1) + ' MB/s' : v + ' KB/s';
         const barColor = v => v > 85 ? S.danger : v > 60 ? S.warning : S.success;
+        const maxNet = Math.max(100, ...sysHistory.map(h => Math.max(h.rx || 0, h.tx || 0))) * 1.2;
         const services = [
           { k: "postgres", nombre: "PostgreSQL", icon: "🗄️", puerto: "5432", online: pgOk },
           { k: "api", nombre: "Node.js API", icon: "⚙️", puerto: "3001", online: true },
@@ -2951,52 +3025,98 @@ window.__App = function CantinaFull() {
             </div>
           </div>
 
-          {/* Row 2: Server metrics + Devices */}
-          <div style={{ display: "flex", gap: 10, flex: "0 0 auto" }}>
-            {/* Metrics */}
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: S.muted, letterSpacing: "0.06em", marginBottom: 6 }}>SERVIDOR</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
-                {[
-                  { label: "CPU", valor: cpu + "%", pct: cpu },
-                  { label: "RAM", valor: ramUsed + "/" + ramTotal + " GB", pct: ramPct },
-                  { label: "DISCO", valor: diskUsed + "/" + diskTotal + " GB", pct: diskPct },
-                  { label: "TEMP", valor: temp + "°C", pct: temp },
-                ].map(m => (
-                  <div key={m.label} style={{ padding: "10px 8px", borderRadius: 10, background: S.surface, border: `1px solid ${S.border}`, textAlign: "center" }}>
-                    <div style={{ fontSize: 12, fontWeight: 800, color: S.muted }}>{m.label}</div>
-                    <div style={{ fontSize: 18, fontWeight: 900, color: barColor(m.pct), marginTop: 2 }}>{m.valor}</div>
-                    <div style={{ height: 4, background: S.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: m.pct + "%", background: barColor(m.pct), borderRadius: 2 }} />
-                    </div>
-                    {m.label === "RAM" && ramPct > 70 && (
-                      <button onClick={async () => { await apiFetch('/system/clear-cache', { method: 'POST' }); showMsg("✅ Cache liberado"); }} style={{
-                        marginTop: 4, padding: "2px 0", width: "100%", borderRadius: 4, border: "none",
-                        background: S.warning + "20", color: S.warning, fontSize: 8, fontWeight: 800, cursor: "pointer",
-                      }}>🧹 Liberar</button>
-                    )}
+          {/* Row 2: Metric charts */}
+          <div style={{ display: "flex", gap: 8, flex: "0 0 auto" }}>
+            {[
+              {
+                label: "CPU", icon: "⚙️",
+                value: cpu + "%", pct: cpu,
+                color: barColor(cpu),
+                chartData: sysHistory.map(h => h.cpu),
+                maxY: 100, unit: "%",
+              },
+              {
+                label: "RAM", icon: "🧠",
+                value: ramUsed + " / " + ramTotal + " GB", pct: ramPct,
+                color: barColor(ramPct),
+                chartData: sysHistory.map(h => h.ram),
+                maxY: 100, unit: "%",
+                extra: ramPct > 70,
+              },
+              {
+                label: "DISCO", icon: "💾",
+                value: diskUsed + " / " + diskTotal, pct: diskPct,
+                color: barColor(diskPct),
+                chartData: sysHistory.map(h => h.disk),
+                maxY: 100, unit: "%",
+              },
+              temp !== null ? {
+                label: "TEMP", icon: "🌡️",
+                value: temp + "°C", pct: temp,
+                color: barColor(temp),
+                chartData: sysHistory.map(h => h.temp || 0),
+                maxY: 100, unit: "°C",
+              } : null,
+              {
+                label: "RED ↓ " + netIface, icon: "📥",
+                value: fmtNet(netRx), pct: null,
+                color: S.info,
+                chartData: sysHistory.map(h => h.rx || 0),
+                maxY: maxNet, unit: "KB/s",
+              },
+              {
+                label: "RED ↑ " + netIface, icon: "📤",
+                value: fmtNet(netTx), pct: null,
+                color: S.accent,
+                chartData: sysHistory.map(h => h.tx || 0),
+                maxY: maxNet, unit: "KB/s",
+              },
+            ].filter(Boolean).map(m => (
+              <div key={m.label} style={{ flex: 1, borderRadius: 12, background: S.surface, border: `1px solid ${m.pct !== null && m.pct > 85 ? m.color + "50" : S.border}`, padding: "10px 10px 8px", display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <div style={{ fontSize: 9, fontWeight: 800, color: S.muted, letterSpacing: "0.07em" }}>{m.label}</div>
+                    <div style={{ fontSize: 17, fontWeight: 900, color: m.pct !== null ? m.color : S.text, lineHeight: 1.2, marginTop: 1 }}>{m.value}</div>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Server info card */}
-            <div style={{ width: 200 }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: S.muted, letterSpacing: "0.06em", marginBottom: 6 }}>🖥️ SERVIDOR</div>
-              <div style={{ padding: "12px 14px", borderRadius: 12, background: S.surface, border: `1px solid ${S.border}` }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: pgOk ? S.success : S.danger, boxShadow: `0 0 6px ${pgOk ? S.success : S.danger}` }} />
-                  <span style={{ fontSize: 14, fontWeight: 800, color: S.text }}>{pgOk ? "Online" : "Offline"}</span>
+                  <span style={{ fontSize: 16, opacity: 0.5 }}>{m.icon}</span>
                 </div>
-                <div style={{ fontSize: 12, color: S.muted, marginBottom: 4 }}>🌐 <span style={{ fontFamily: "'JetBrains Mono', monospace", color: S.text, fontWeight: 700 }}>{ip}</span></div>
-                <div style={{ fontSize: 12, color: S.muted, marginBottom: 4 }}>⏱️ <span style={{ color: S.text, fontWeight: 700 }}>{uptime}</span></div>
-                <div style={{ fontSize: 12, color: S.muted, marginBottom: 8 }}>📱 <span style={{ color: S.text, fontWeight: 700 }}>{connections} conexiones</span></div>
-                <button onClick={async () => { showMsg("🧹 Liberando RAM..."); await apiFetch('/system/clear-cache', { method: 'POST' }); showMsg("✅ RAM liberada"); }} style={{
-                  width: "100%", padding: "8px 0", borderRadius: 8, border: "none",
-                  background: S.info + "20", color: S.info, fontSize: 12, fontWeight: 800, cursor: "pointer",
-                }}>🧹 Liberar RAM</button>
+                <div style={{ flex: 1, minHeight: 52, marginTop: 2 }}>
+                  {m.chartData.length >= 2
+                    ? React.createElement(SysChart, { data: m.chartData, color: m.color, maxY: m.maxY, unit: m.unit })
+                    : <div style={{ height: 52, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: S.muted }}>Esperando datos…</div>
+                  }
+                </div>
+                {m.pct !== null && (
+                  <div style={{ height: 3, background: S.border, borderRadius: 2, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: Math.min(m.pct, 100) + "%", background: m.color, borderRadius: 2, transition: "width 0.5s ease" }} />
+                  </div>
+                )}
+                {m.extra && (
+                  <button onClick={async () => { await apiFetch('/system/clear-cache', { method: 'POST' }); showMsg("✅ RAM liberada"); }} style={{ padding: "3px 0", borderRadius: 5, border: "none", background: S.warning + "20", color: S.warning, fontSize: 9, fontWeight: 800, cursor: "pointer" }}>
+                    🧹 Liberar cache
+                  </button>
+                )}
               </div>
-            </div>
+            ))}
+          </div>
+
+          {/* Row 2b: Server info strip */}
+          <div style={{ display: "flex", gap: 8, flex: "0 0 auto", alignItems: "center", padding: "8px 12px", borderRadius: 10, background: S.surface, border: `1px solid ${S.border}` }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: pgOk ? S.success : S.danger, boxShadow: `0 0 6px ${pgOk ? S.success : S.danger}`, flexShrink: 0 }} />
+            <span style={{ fontSize: 12, fontWeight: 800, color: pgOk ? S.success : S.danger }}>{pgOk ? "Sistema Online" : "BD Offline"}</span>
+            <div style={{ width: 1, height: 14, background: S.border, margin: "0 4px" }} />
+            <span style={{ fontSize: 11, color: S.muted }}>🌐</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: S.text, fontFamily: "'JetBrains Mono', monospace" }}>{ip}</span>
+            <div style={{ width: 1, height: 14, background: S.border, margin: "0 4px" }} />
+            <span style={{ fontSize: 11, color: S.muted }}>⏱️</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: S.text }}>{uptime}</span>
+            <div style={{ width: 1, height: 14, background: S.border, margin: "0 4px" }} />
+            <span style={{ fontSize: 11, color: S.muted }}>📱</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: S.text }}>{connections} clientes</span>
+            <div style={{ flex: 1 }} />
+            <button onClick={async () => { showMsg("🧹 Liberando RAM..."); await apiFetch('/system/clear-cache', { method: 'POST' }); showMsg("✅ RAM liberada"); }} style={{ padding: "5px 12px", borderRadius: 7, border: "none", background: S.info + "20", color: S.info, fontSize: 11, fontWeight: 800, cursor: "pointer" }}>
+              🧹 Liberar RAM
+            </button>
           </div>
 
           {/* Row 3: Quick actions */}

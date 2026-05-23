@@ -81,8 +81,22 @@ App principal:   http://192.168.100.54/
 Cocina:          http://192.168.100.54/cocina.html
 Autoservicio:    http://192.168.100.54/autoservicio.html
 TV Promociones:  http://192.168.100.54/promo.html
+Monitor Netdata: http://192.168.100.54/monitor/
 API health:      http://192.168.100.54/api/health
 ```
+
+## Monitoreo — Netdata
+
+Dashboard profesional de métricas del servidor en tiempo real.
+
+- **URL:** `http://192.168.100.54/monitor/`
+- **También desde el POS:** pestaña Sistema → botón **📊 Monitor**
+- **Instalación:** `sudo bash scripts/setup_netdata.sh` (requiere internet solo la primera vez)
+- **Puerto interno:** 19999 (bind a localhost, acceso solo vía nginx)
+- **Métricas:** CPU, RAM, disco, red, procesos, temperatura, y más
+- **Resolución:** 1 segundo, historial de horas/días incluido
+
+El POS también muestra sparklines inline (CPU, RAM, disco, red RX/TX) con los últimos 10 minutos de historial usando `GET /api/system/history`.
 
 ## TV Promociones (carrusel)
 

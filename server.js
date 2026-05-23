@@ -13,6 +13,11 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
+// Circular buffer for system metrics history (last 120 samples @ 5s = 10 min)
+const METRICS_HISTORY_MAX = 120;
+const metricsHistory = [];
+let lastNetSample = null; // { ts, rx, tx } for rate calculation
+
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 app.use('/images', express.static(path.join(__dirname, 'images')));
@@ -76,6 +81,29 @@ app.get('/api/system', async (req, res) => {
       }
     }
 
+    // Network throughput (KB/s) from /proc/net/dev
+    let net = { rx_kbps: 0, tx_kbps: 0, iface: '' };
+    try {
+      const netRaw = fs.readFileSync('/proc/net/dev', 'utf8');
+      const lines = netRaw.split('\n').slice(2).filter(l => l.includes(':') && !l.includes('lo:'));
+      if (lines.length > 0) {
+        const parts = lines[0].trim().split(/[\s:]+/);
+        const iface = parts[0];
+        const rx = parseInt(parts[1]) || 0;
+        const tx = parseInt(parts[9]) || 0;
+        const now = Date.now();
+        if (lastNetSample && lastNetSample.iface === iface) {
+          const dtSec = (now - lastNetSample.ts) / 1000;
+          if (dtSec > 0) {
+            net.rx_kbps = Math.round((rx - lastNetSample.rx) / 1024 / dtSec);
+            net.tx_kbps = Math.round((tx - lastNetSample.tx) / 1024 / dtSec);
+          }
+        }
+        net.iface = iface;
+        lastNetSample = { ts: now, rx, tx, iface };
+      }
+    } catch(e) {}
+
     // Printer & scanner detection
     let printerOk = false, scannerOk = false;
     try {
@@ -84,17 +112,34 @@ app.get('/api/system', async (req, res) => {
       scannerOk = /barcode|scanner|hid/i.test(lsusb);
     } catch(e) {}
 
-    res.json({
+    const payload = {
       cpu: parseInt(cpu) || 0,
       ram: { used: parseInt(ramUsed) || 0, total: parseInt(ramTotal) || 0 },
       disk: { pct: parseInt(diskPct) || 0, used: diskUsed, total: diskTotal },
-      temp, uptime, ip, connections: wsConns,
+      net, temp, uptime, ip, connections: wsConns,
       services: { postgresql: pgOk, api: apiOk, printer: printerOk, scanner: scannerOk },
       lastBackup,
+    };
+
+    // Store in metrics history circular buffer
+    metricsHistory.push({
+      t: Date.now(),
+      cpu: payload.cpu,
+      ram: payload.ram.total > 0 ? Math.round(payload.ram.used / payload.ram.total * 100) : 0,
+      disk: payload.disk.pct,
+      rx: Math.max(0, net.rx_kbps),
+      tx: Math.max(0, net.tx_kbps),
     });
+    if (metricsHistory.length > METRICS_HISTORY_MAX) metricsHistory.shift();
+
+    res.json(payload);
   } catch(e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+app.get('/api/system/history', (req, res) => {
+  res.json(metricsHistory);
 });
 
 // Restart a service

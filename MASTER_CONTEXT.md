@@ -50,6 +50,7 @@ El sistema está **en producción y funcionando**. Todos los servicios levantan 
 | Cocina | `http://192.168.100.54/cocina.html` | Pantalla cocina |
 | Autoservicio | `http://192.168.100.54/autoservicio.html` | Tablet clientes |
 | TV Promociones | `http://192.168.100.54/promo.html` | TV del salón |
+| Monitor Netdata | `http://192.168.100.54/monitor/` | Técnico / admin |
 
 **Servidor:** `ssh cantina@192.168.100.54` — IP fija en la LAN.
 
@@ -87,6 +88,21 @@ CarouselImage  → imágenes para el TV del salón (filename, orden, activo)
 **Estados de pedido:** `pendiente` → `en_preparacion` → `listo` → `entregado` / `cancelado`
 
 ---
+
+## Monitoreo — Netdata + sparklines inline
+
+**Netdata** es el dashboard profesional de métricas del servidor.
+- URL: `http://192.168.100.54/monitor/` (proxy nginx → localhost:19999)
+- Se instala con: `sudo bash scripts/setup_netdata.sh`
+- Métricas en tiempo real: CPU, RAM, disco, red, temperatura, procesos, etc.
+- Resolución de 1 segundo, historial de horas/días incluido
+- Sin configuración adicional — auto-descubrimiento completo
+
+**Sparklines inline en el POS** (pestaña Sistema):
+- Gráficos Chart.js en tiempo real: CPU%, RAM%, Disco%, Red RX, Red TX
+- Datos vienen de `GET /api/system` cada 5s + historial desde `GET /api/system/history`
+- Historial en memoria: últimos 120 registros (~10 min a 5s de intervalo)
+- Botón "📊 Monitor" abre Netdata completo en nueva pestaña
 
 ## TV Promo Carousel
 
