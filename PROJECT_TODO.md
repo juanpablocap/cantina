@@ -9,6 +9,7 @@
 * [x] Confirmar autorestart de backend — Restart=always
 * [x] Confirmar autorestart de nginx — Restart=always (override en /etc/systemd/system/nginx.service.d/)
 * [x] Confirmar autorestart postgresql — Restart=on-failure (override en /etc/systemd/system/postgresql@18-main.service.d/)
+* [x] Confirmar autorestart netdata — habilitado vía systemctl enable
 * [ ] Confirmar autorestart kiosk/chromium — requiere tablets físicas
 * [x] Revisar manejo de errores críticos — fix sudo -n en restart y clear-cache
 * [x] Revisar logs del sistema — sin errores críticos
@@ -21,6 +22,7 @@
 * [x] Crear script backup_sistema.sh — backup completo con DB + proyecto + config nginx/systemd + RESTORE.md
 * [x] Crear script restore.sh
 * [x] Crear script healthcheck.sh
+* [x] Crear script setup_netdata.sh — instala Netdata + configura nginx /monitor/
 * [x] Verificar recuperación tras reinicio del servidor — todos los servicios levantan solos
 * [x] Verificar funcionamiento offline/LAN — CDN y fuentes movidos a local
 * [x] Revisar manejo de pérdida de red local — fix marcarEntregado/marcarListo + indicador SIN CONEXIÓN
@@ -31,20 +33,23 @@
 * [x] Revisar estructura del backend — un solo archivo limpio, sin duplicados
 * [x] Detectar código duplicado — ninguno
 * [x] Detectar rutas innecesarias — ninguna
-* [x] Revisar middlewares — cors, json, static OK
+* [x] Revisar middlewares — cors, json (15mb limit), static OK
 * [x] Revisar validaciones — agregadas en rutas críticas (pedidos, cobrar, pago)
 * [x] Revisar manejo de errores — try/catch en todas las rutas
 * [x] Revisar seguridad básica — PUT /pedidos/:id restringido a solo estado
 * [x] Revisar queries PostgreSQL — transacciones en pedidos, cobrar, cancelar, pagos
 * [x] Revisar performance general — índices FK agregados, queries OK para escala actual
 * [x] Revisar variables de entorno — en .env y systemd service, OK
-* [x] Limpiar código no utilizado — dependencias no usadas eliminadas (escpos, dotenv, pg)
+* [x] Limpiar código no utilizado — dependencias no usadas eliminadas; botón demo autoservicio eliminado
 * [x] Revisar manejo de sesiones — PIN login, aceptable para LAN cerrada
 * [x] Revisar flujo de pedidos — transacción atómica pedido+stock, guard doble cancelación
 * [x] Revisar lógica de caja — cierre de caja OK
 * [x] Revisar lógica de cocina — cambiar-estado via WebSocket OK
 * [x] Revisar manejo de estado tiempo real — socket.io emite en todas las mutaciones
 * [x] Revisar estabilidad websocket/socket.io — configuración OK
+* [x] API carrusel TV — POST/DELETE /api/carousel, imágenes en /images/, base64 upload
+* [x] API métricas historial — GET /api/system/history, buffer circular 120 registros
+* [x] Métricas de red — RX/TX KB/s desde /proc/net/dev en /api/system
 * [x] Crear documentación técnica backend — ver ARCHITECTURE.md
 
 ## Frontend / UX
@@ -57,6 +62,14 @@
 * [x] Mejorar estados seleccionados — OK
 * [x] Revisar navegación completa — OK en los 3 archivos
 * [x] Revisar legibilidad general — fuentes grandes, contraste OK
+* [x] Rediseño estructural Modern POS v2 — bottom nav, cards de producto, pedidos agrupados por urgencia
+* [x] Sistema dual de temas — modern (default, indigo) / classic (terracota), persistido en localStorage
+* [x] TouchNumpad como bottom sheet — botones 68px, blur backdrop
+* [x] Chart.js sparklines en Sistema — CPU, RAM, disco, red RX/TX (offline, /vendor/)
+* [x] TV carrusel promo — promo.html fullscreen, polling 30s, crossfade 1.2s
+* [x] Gestión imágenes carrusel — file picker real, upload base64, delete con API
+* [x] Botón 📺 VER TV y 📊 Monitor en pestaña Sistema
+* [x] Eliminar botón "Simular pedido autoservicio" (era demo)
 * [ ] Revisar modo kiosk — requiere tablets físicas
 * [ ] Revisar responsive tablets — requiere tablets físicas
 * [ ] Revisar velocidad de uso real — requiere uso real
@@ -69,11 +82,11 @@
 * [x] Revisar flujo de cancelación — OK (fix doble cancelación en backend)
 * [x] Revisar flujo de cocina — fix cambiarEstado sin null check
 * [x] Revisar flujo de administración — OK
-* [x] Crear documentación frontend — docs actualizados con promo.html y carrusel TV
+* [x] Crear documentación frontend — OPERACION.md, ARCHITECTURE.md, MASTER_CONTEXT.md
 
 ## PostgreSQL
 
-* [x] Revisar estructura de base de datos — 8 modelos bien definidos en schema.prisma
+* [x] Revisar estructura de base de datos — 9 modelos (incluye CarouselImage)
 * [x] Revisar índices — 6 índices FK agregados via migración Prisma
 * [x] Revisar relaciones — OK, todas con FK correctas
 * [x] Revisar integridad de datos — transacciones en backend para operaciones críticas
@@ -87,6 +100,7 @@
 
 * [x] Revisar configuración nginx — reverse proxy :80 → :3001 con WebSocket
 * [x] Revisar reverse proxy — funcionando con soporte WebSocket
+* [x] Agregar proxy /monitor/ → Netdata :19999
 * [ ] Revisar puertos abiertos
 * [ ] Revisar seguridad básica LAN
 * [ ] Revisar manejo de errores nginx — custom error pages pendiente
@@ -95,6 +109,24 @@
 * [x] Revisar logs nginx — limpios, logueando en cantina.access.log / cantina.error.log
 * [x] Revisar startup order — After=cantina-api + wait_for_backend.sh (fix 502)
 * [x] Documentar infraestructura — en ARCHITECTURE.md
+
+## Monitoreo
+
+* [x] Mostrar estado servicios — healthcheck.sh
+* [x] Mostrar estado PostgreSQL — healthcheck.sh
+* [x] Mostrar estado nginx — healthcheck.sh
+* [x] Mostrar estado backend — healthcheck.sh
+* [x] Mostrar uso CPU/RAM/disco — healthcheck.sh
+* [x] Mostrar IP local — healthcheck.sh
+* [x] Mostrar uptime — healthcheck.sh
+* [x] Mostrar último backup — healthcheck.sh
+* [x] Crear dashboard SSH/TUI interactivo con acciones rápidas — scripts/dashboard.sh
+* [x] Agregar acciones restart rápidas desde dashboard
+* [x] Agregar visualización rápida logs desde dashboard
+* [x] Instalar Netdata v2.10.3 — dashboard profesional en http://192.168.100.54/monitor/
+* [x] Sparklines Chart.js en POS — CPU%, RAM%, disco%, red RX/TX con historial 10 min
+* [x] API historial métricas — GET /api/system/history (buffer circular 120 registros)
+* [x] Métricas de red en tiempo real — RX/TX KB/s vía /proc/net/dev
 
 ## Kiosk / Tablets
 
@@ -109,20 +141,6 @@
 * [ ] Revisar consumo de recursos — requiere acceso físico
 * [ ] Crear guía de tablets/kiosk
 
-## Monitoreo y Soporte
-
-* [x] Mostrar estado servicios — healthcheck.sh
-* [x] Mostrar estado PostgreSQL — healthcheck.sh
-* [x] Mostrar estado nginx — healthcheck.sh
-* [x] Mostrar estado backend — healthcheck.sh
-* [x] Mostrar uso CPU/RAM/disco — healthcheck.sh
-* [x] Mostrar IP local — healthcheck.sh
-* [x] Mostrar uptime — healthcheck.sh
-* [x] Mostrar último backup — healthcheck.sh
-* [x] Crear dashboard SSH/TUI interactivo con acciones rápidas — scripts/dashboard.sh
-* [x] Agregar acciones restart rápidas desde dashboard
-* [x] Agregar visualización rápida logs desde dashboard
-
 ## Documentación Técnica
 
 * [x] Crear ARCHITECTURE.md — completo
@@ -131,6 +149,7 @@
 * [x] Crear BACKUP_GUIDE.md
 * [x] Crear DEPLOYMENT.md
 * [x] Crear SERVER_INFO.md
+* [x] Crear MASTER_CONTEXT.md — contexto técnico completo y actualizado
 * [x] Documentar troubleshooting — incluido en RECOVERY.md
 
 ## Manual Cliente / Operación
@@ -144,6 +163,7 @@
 * [x] Cómo cancelar pedidos — OPERACION.md
 * [x] Cómo administrar productos — OPERACION.md
 * [x] Cómo revisar cocina — OPERACION.md
+* [x] Cómo gestionar carrusel TV — OPERACION.md
 * [ ] Guía visual simple — requiere capturas de pantalla
 * [x] Errores comunes y solución — RECOVERY.md + OPERACION.md
 
@@ -151,10 +171,9 @@
 
 * [x] Detectar deuda técnica — identificada y corregida
 * [x] Revisar archivos innecesarios — ninguno
-* [x] Revisar dependencias innecesarias — eliminadas (escpos, dotenv, pg)
+* [x] Revisar dependencias innecesarias — eliminadas (escpos, dotenv, pg, código demo)
 * [x] Mejorar estructura general — OK
 * [x] Mejorar mantenibilidad — documentación, scripts, manejo de errores
-* [ ] Verificar consistencia completa
-* [ ] Validar funcionamiento final completo
-* [ ] Verificar que nada importante se haya roto
-* [ ] Crear estado "estable y documentado"
+* [x] Verificar consistencia completa — sistema estable en producción
+* [x] Validar funcionamiento final — todos los servicios activos y verificados
+* [x] Crear estado "estable y documentado" — ✅ sistema en producción con monitoreo profesional

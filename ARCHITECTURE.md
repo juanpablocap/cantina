@@ -76,13 +76,14 @@ Un solo archivo Node.js con Express. Usa Prisma como ORM sobre PostgreSQL.
 ### Rutas API
 
 **Sistema**
-| Método | Ruta                          | Descripción                        |
-|--------|-------------------------------|------------------------------------|
-| GET    | /api/health                   | Health check simple                |
-| GET    | /api/system                   | CPU, RAM, disco, servicios, backup |
-| POST   | /api/system/restart/:service  | Reinicia cantina-api o postgresql  |
-| POST   | /api/system/clear-cache       | Limpia caché RAM                   |
-| POST   | /api/system/backup            | Genera backup de la DB             |
+| Método | Ruta                          | Descripción                                              |
+|--------|-------------------------------|----------------------------------------------------------|
+| GET    | /api/health                   | Health check simple                                      |
+| GET    | /api/system                   | CPU, RAM, disco, red (RX/TX KB/s), temp, servicios       |
+| GET    | /api/system/history           | Historial de métricas (buffer circular 120 registros)    |
+| POST   | /api/system/restart/:service  | Reinicia cantina-api o postgresql                        |
+| POST   | /api/system/clear-cache       | Limpia caché RAM                                         |
+| POST   | /api/system/backup            | Genera backup de la DB                                   |
 
 **Usuarios y autenticación**
 | Método | Ruta              | Descripción                   |
@@ -198,7 +199,22 @@ Página sin UI (fullscreen, sin cursor) diseñada para correr en el TV del saló
 - Las imágenes se gestionan desde la pestaña **Sistema** del POS (botón 📁 + importar)
 - Los archivos se guardan en `/home/cantina/cantina-pos/images/`
 
-El frontend usa React con Babel en el browser (sin build step en producción). Las dependencias (React, ReactDOM, Babel, fuentes) están en `/vendor/` y `/fonts/` — **sin dependencias de internet**.
+El frontend usa React con Babel en el browser (sin build step en producción). Las dependencias (React, ReactDOM, Babel, Chart.js, fuentes) están en `/vendor/` y `/fonts/` — **sin dependencias de internet**.
+
+### Sistema de temas (Modern POS v2)
+
+El POS tiene dos temas visuales switchables sin recargar:
+- **`modern`** (default): indigo `#6366F1`, bg `#070A12`, bottom navigation, sparklines
+- **`classic`**: terracota `#E07A5F`, bg `#0A0D14`, top navigation con 9 tabs
+
+El tema se persiste en `localStorage` clave `posTheme`. Cada tema define un objeto `S.*` con tokens de color usados en todo el JSX.
+
+### Sparklines en el dashboard
+
+La pestaña **Sistema** del POS muestra 6 gráficos en tiempo real (Chart.js 4.4):
+- CPU%, RAM%, Disco% — datos de `GET /api/system` cada 5s
+- Red RX / Red TX — KB/s calculados desde `/proc/net/dev`
+- Historial: buffer circular 120 registros (~10 min), recuperado al iniciar desde `GET /api/system/history`
 
 ---
 
@@ -206,8 +222,22 @@ El frontend usa React con Babel en el browser (sin build step en producción). L
 
 Proxy inverso en puerto 80 → Node.js en 3001.
 - WebSocket habilitado para Socket.io en `/socket.io/`
+- `/monitor/` → Netdata en `localhost:19999` (sin X-Frame-Options)
 - Logs en `/var/log/nginx/cantina.access.log` y `cantina.error.log`
-- Config en `/etc/nginx/sites-enabled/cantina`
+- Config en `/etc/nginx/sites-available/cantina` (symlink en `sites-enabled/`)
+- Config fuente del proyecto: `scripts/nginx-cantina.conf`
+
+---
+
+## Monitoreo — Netdata
+
+Instalado en el servidor. Dashboard profesional accesible en `http://192.168.100.54/monitor/`.
+
+- **Versión:** v2.10.3
+- **Puerto interno:** `127.0.0.1:19999` (bind a loopback, solo accesible vía nginx)
+- **Resolución:** 1 segundo, historial de horas/días automático
+- **Métricas:** CPU, RAM, disco, red, temperatura, procesos, y más (200+ métricas)
+- **Instalación/reinstalación:** `sudo bash scripts/setup_netdata.sh`
 
 ---
 
@@ -216,11 +246,12 @@ Proxy inverso en puerto 80 → Node.js en 3001.
 Todos en `scripts/`, ejecutar con `bash scripts/<nombre>.sh`:
 
 ```bash
-bash scripts/healthcheck.sh       # Ver estado del sistema
-bash scripts/backup.sh            # Hacer backup manual
-bash scripts/restore.sh <archivo> # Restaurar backup
-bash scripts/restart_backend.sh   # Reiniciar solo el backend
-bash scripts/restart_all.sh       # Reiniciar todo en orden
+bash scripts/healthcheck.sh         # Ver estado del sistema
+bash scripts/backup.sh              # Hacer backup manual
+bash scripts/restore.sh <archivo>   # Restaurar backup
+bash scripts/restart_backend.sh     # Reiniciar solo el backend
+bash scripts/restart_all.sh         # Reiniciar todo en orden
+sudo bash scripts/setup_netdata.sh  # Instalar/reconfigurar Netdata
 ```
 
 ---
