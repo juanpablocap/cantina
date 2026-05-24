@@ -150,6 +150,7 @@
 * [x] Crear DEPLOYMENT.md
 * [x] Crear SERVER_INFO.md
 * [x] Crear MASTER_CONTEXT.md — contexto técnico completo y actualizado
+* [x] Crear CLAUDE.md — contexto para Claude Code: stack, archivos, UI, riesgos vigentes
 * [x] Documentar troubleshooting — incluido en RECOVERY.md
 
 ## Manual Cliente / Operación
