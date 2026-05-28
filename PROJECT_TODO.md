@@ -1,5 +1,16 @@
 # TODO Proyecto Cantina POS
 
+## UX / Features recientes (mayo 2026)
+
+* [x] Modal cobrar: compactar padding/spacing para que entre sin scroll en pantallas tablet
+* [x] Modal cobrar: mostrar destino en el header junto al número (#001 · Mesa 4, Barra, etc.)
+* [x] Modal cobrar: botones de descuento más chicos (padding y font-size −25%)
+* [x] Ticket post-cobro: cierre automático en 1 segundo (antes 3s)
+* [x] Botón pantalla completa: reducido a 2/3 del tamaño original
+* [x] Prefix de mozo en número de pedido: A001 / B001 en vez de #001 cuando la mesa tiene mozo asignado
+* [x] Panel de detalle de mesa: selector de mozo por iniciales (persistido en servidor, sincroniza cocina)
+* [x] cocina.html: muestra initial del mozo en el número grande de cada tarjeta, sincroniza cada 30s
+
 ## PRIORIDAD ALTA — Estabilidad y Recovery
 
 * [x] Auditar estructura completa del proyecto

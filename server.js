@@ -525,6 +525,15 @@ app.get('/api/cierres', async (req, res) => {
 // ============================================
 // AUTOSERVICIO (pending orders for caja approval)
 // ============================================
+const mesasMozos = {}; // { [mesa_numero]: usuario_id } — en memoria, se limpia al reiniciar
+app.get('/api/mesas/mozos', (req, res) => res.json(mesasMozos));
+app.put('/api/mesas/mozos', (req, res) => {
+  const { mesa, userId } = req.body;
+  if (userId === null || userId === undefined) delete mesasMozos[mesa];
+  else mesasMozos[mesa] = userId;
+  res.json(mesasMozos);
+});
+
 const pendingAutoservicio = [];
 app.post('/api/autoservicio/pedido', (req, res) => {
   const pedido = { ...req.body, id: Date.now(), numero: pendingAutoservicio.length + 1 };

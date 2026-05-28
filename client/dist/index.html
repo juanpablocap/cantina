@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Cantina POS — Caja</title>
-<style>*{box-sizing:border-box;margin:0;padding:0}body{margin:0;background:#0A0D14;color:#EAECF0;overflow:hidden;height:100vh}#root{height:100vh;color:#EAECF0}input:focus,select:focus{outline:none}::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#1E2230;border-radius:3px}</style>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{margin:0;background:#0A0D14;color:#EAECF0;overflow:hidden;height:100vh;overscroll-behavior-y:contain}#root{height:100vh;color:#EAECF0}input:focus,select:focus{outline:none}::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#1E2230;border-radius:3px}</style>
 </head>
 <body>
 <div id="root"></div>
@@ -79,6 +79,12 @@ const THEMES = {
     tabBg: "#12151C", tabActive: "#E07A5F", tabBadge: "solid",
   },
   modern: {
+    bg: "#070A12", surface: "#0D1120", surfaceHover: "#131829", border: "#1A2140",
+    text: "#EAF0FF", muted: "#4A5578", accent: "#6366F1", accentHover: "#4F52D8",
+    success: "#10B981", warning: "#F59E0B", danger: "#EF4444", info: "#3B82F6",
+    tabBg: "transparent", tabActive: "#6366F1", tabBadge: "solid",
+  },
+  tablet: {
     bg: "#070A12", surface: "#0D1120", surfaceHover: "#131829", border: "#1A2140",
     text: "#EAF0FF", muted: "#4A5578", accent: "#6366F1", accentHover: "#4F52D8",
     success: "#10B981", warning: "#F59E0B", danger: "#EF4444", info: "#3B82F6",
@@ -242,7 +248,8 @@ function TouchNumpad({ title, value, onChange, onDone, onCancel, prefix, maxLen,
 window.__App = function CantinaFull() {
   const [theme, setTheme] = useState(() => localStorage.getItem('posTheme') || 'modern');
   const toggleTheme = () => {
-    const next = theme === 'modern' ? 'classic' : 'modern';
+    const themeOrder = ['modern', 'classic', 'tablet'];
+    const next = themeOrder[(themeOrder.indexOf(theme) + 1) % themeOrder.length];
     setTheme(next);
     localStorage.setItem('posTheme', next);
   };
@@ -322,7 +329,10 @@ window.__App = function CantinaFull() {
   const prevPedidosRef = useRef([]);
   const [descuento, setDescuento] = useState({ tipo: "none", valor: "" });
   const [mesaNotas, setMesaNotas] = useState({});
+  const [mesasMozos, setMesasMozos] = useState({});
   const [mesaSeleccionada, setMesaSeleccionada] = useState(null);
+  const [mesasTabFilter, setMesasTabFilter] = useState("todas");
+  const [tabletMenuOpen, setTabletMenuOpen] = useState(false);
   const [arqueoEfectivo, setArqueoEfectivo] = useState("");
   const [ticketVisible, setTicketVisible] = useState(null);
   const [touchKb, setTouchKb] = useState(null);
@@ -348,13 +358,14 @@ window.__App = function CantinaFull() {
   useEffect(() => {
     if (!loggedIn) return;
     const loadData = async () => {
-      const [prods, peds, clients, users, cierres, carousel] = await Promise.all([
+      const [prods, peds, clients, users, cierres, carousel, mozosMap] = await Promise.all([
         apiFetch('/productos'),
         apiFetch('/pedidos'),
         apiFetch('/clientes'),
         apiFetch('/usuarios'),
         apiFetch('/cierres'),
         apiFetch('/carousel'),
+        apiFetch('/mesas/mozos'),
       ]);
       if (prods && prods.length > 0) {
         setProductos(prods);
@@ -369,6 +380,7 @@ window.__App = function CantinaFull() {
       if (users) setUsuarios(users);
       if (cierres) setCierresHistorial(cierres);
       if (carousel) setCarouselImages(carousel);
+      if (mozosMap) setMesasMozos(mozosMap);
       setDataLoaded(true);
     };
     loadData();
@@ -525,7 +537,7 @@ window.__App = function CantinaFull() {
 
   // ===== LOGIN SCREEN =====
   if (!loggedIn) {
-    const isModern = theme === 'modern';
+    const isModern = theme !== 'classic';
     return React.createElement("div", { "data-theme": theme, style: { height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: isModern ? `radial-gradient(ellipse at 50% 0%, ${S_login.accent}18 0%, ${S_login.bg} 65%)` : S_login.bg, fontFamily: "'DM Sans', -apple-system, sans-serif" } },
       React.createElement("style", null, `
         @import url('/fonts/dm-jb.css');
@@ -534,8 +546,8 @@ window.__App = function CantinaFull() {
         @keyframes shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
         .fade-in { animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
         .shake { animation: shake 0.4s ease-out; }
-        [data-theme="modern"] button { transition: transform 0.1s ease, box-shadow 0.15s ease; }
-        [data-theme="modern"] button:active { transform: scale(0.94) !important; }
+        [data-theme="modern"] button, [data-theme="tablet"] button { transition: transform 0.1s ease, box-shadow 0.15s ease; }
+        [data-theme="modern"] button:active, [data-theme="tablet"] button:active { transform: scale(0.94) !important; }
       `),
       React.createElement("div", { className: "fade-in", style: { width: "100%", maxWidth: 360, padding: "36px 32px", textAlign: "center", background: isModern ? S_login.surface : "transparent", borderRadius: isModern ? 24 : 0, border: isModern ? `1px solid ${S_login.border}` : "none", boxShadow: isModern ? `0 24px 64px rgba(0,0,0,0.5), 0 0 0 1px ${S_login.accent}20` : "none" } },
         // Logo
@@ -582,7 +594,7 @@ window.__App = function CantinaFull() {
 
         // Theme toggle link
         React.createElement("button", { onClick: toggleTheme, style: { marginTop: 20, background: "none", border: "none", cursor: "pointer", fontSize: 10, color: S_login.muted, display: "block", width: "100%", textAlign: "center" } },
-          theme === 'modern' ? '☀️ Cambiar a tema clásico' : '🌙 Cambiar a tema moderno'
+          theme === 'modern' ? '☀️ Cambiar a Clásico' : theme === 'classic' ? '📱 Cambiar a Tablet' : '🌙 Cambiar a Moderno'
         )
       )
     );
@@ -688,7 +700,7 @@ window.__App = function CantinaFull() {
     
     if (pedOriginal && pedOriginal.tipo === "mesa" && pedOriginal.mesa_numero) {
       // Cobrar todos los pedidos de esa mesa
-      const mesaPeds = pedidos.filter(p => p.tipo === "mesa" && Number(p.mesa_numero) === Number(pedOriginal.mesa_numero) && !p.cobrado);
+      const mesaPeds = pedidos.filter(p => p.tipo === "mesa" && Number(p.mesa_numero) === Number(pedOriginal.mesa_numero) && !p.cobrado && p.estado !== 'cancelado');
       mesaPeds.forEach(p => pedidosACobrar.push(p.id));
     } else {
       pedidosACobrar.push(pedidoId);
@@ -717,7 +729,7 @@ window.__App = function CantinaFull() {
       setCobrandoPedido(null);
       setTicketVisible(pedOriginal);
       playCajaCobroSound();
-      setTimeout(() => setTicketVisible(null), 3000);
+      setTimeout(() => setTicketVisible(null), 1000);
       showMsg("💰 Cobrado $" + totalCobrado.toLocaleString() + " con " + (metodo === "efectivo" ? "efectivo" : metodo === "transferencia" ? "transferencia" : "fiado"));
     } else {
       showMsg("❌ Error al cobrar");
@@ -742,7 +754,7 @@ window.__App = function CantinaFull() {
     if (!ped) return;
     const result = await apiFetch(`/pedidos/${pedidoId}/cancelar`, { method: 'POST' });
     if (!result) { showMsg("❌ Error al cancelar pedido"); return; }
-    setPedidos(prev => prev.map(p => p.id === pedidoId ? { ...p, estado: "cancelado", cobrado: true } : p));
+    setPedidos(prev => prev.map(p => p.id === pedidoId ? { ...p, estado: "cancelado" } : p));
     setProductos(prev => prev.map(p => {
       const item = ped.items.find(i => i.producto_id === p.id);
       return item ? { ...p, stock: p.stock + item.cantidad } : p;
@@ -750,8 +762,21 @@ window.__App = function CantinaFull() {
     showMsg("❌ Pedido #" + String(ped.numero).padStart(3, "0") + " cancelado — stock devuelto");
   };
 
+  // Returns "#" or the mozo's initial for mesa pedidos
+  const pedidoPrefix = (p) => {
+    if (p.tipo !== "mesa" || !mesasMozos[p.mesa_numero]) return "#";
+    const u = usuarios.find(u => u.id === mesasMozos[p.mesa_numero]);
+    return u ? u.nombre[0].toUpperCase() : "#";
+  };
+  const asignarMozo = async (mesa, userId) => {
+    const next = { ...mesasMozos };
+    if (userId === null) delete next[mesa]; else next[mesa] = userId;
+    setMesasMozos(next);
+    await apiFetch('/mesas/mozos', { method: 'PUT', body: { mesa, userId: userId ?? null } });
+  };
+
   // Mesa helpers
-  const pedidosMesa = (num) => pedidos.filter(p => p.tipo === "mesa" && Number(p.mesa_numero) === Number(num) && !p.cobrado);
+  const pedidosMesa = (num) => pedidos.filter(p => p.tipo === "mesa" && Number(p.mesa_numero) === Number(num) && !p.cobrado && p.estado !== 'cancelado');
   const mesaActiva = (num) => pedidosMesa(num).length > 0;
   const totalMesa = (num) => pedidosMesa(num).filter(p => !p.cobrado).reduce((s, p) => s + p.total, 0);
 
@@ -838,18 +863,20 @@ window.__App = function CantinaFull() {
         @keyframes pulseNotif { 0%, 100% { box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 0 0 rgba(255,184,51,0); } 50% { box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 0 4px rgba(255,184,51,0.3); } }
         @keyframes pulseBlue { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         .pulse-blue { animation: pulseBlue 1.4s ease-in-out infinite; }
-        ${theme === 'modern' ? `
-          [data-theme="modern"] button { transition: transform 0.1s ease, opacity 0.1s ease, background 0.15s ease, box-shadow 0.15s ease; }
-          [data-theme="modern"] button:active:not([disabled]) { transform: scale(0.95) !important; }
-          [data-theme="modern"] input:focus { box-shadow: 0 0 0 3px ${S.accent}30 !important; }
-          [data-theme="modern"] select:focus { box-shadow: 0 0 0 3px ${S.accent}30 !important; }
+        ${theme !== 'classic' ? `
+          [data-theme="${theme}"] button { transition: transform 0.1s ease, opacity 0.1s ease, background 0.15s ease, box-shadow 0.15s ease; }
+          [data-theme="${theme}"] button:active:not([disabled]) { transform: scale(0.95) !important; }
+          [data-theme="${theme}"] input:focus { box-shadow: 0 0 0 3px ${S.accent}30 !important; }
+          [data-theme="${theme}"] select:focus { box-shadow: 0 0 0 3px ${S.accent}30 !important; }
           @keyframes modernSlideUp { from { opacity: 0; transform: translateY(12px) scale(0.99); } to { opacity: 1; transform: translateY(0) scale(1); } }
-          [data-theme="modern"] .anim-in { animation: modernSlideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
-          /* Fade-in for pedidos rows */
-          [data-theme="modern"] .pedido-row-enter { animation: modernSlideUp 0.18s ease-out; }
-          /* Smoother scrollbars */
+          [data-theme="${theme}"] .anim-in { animation: modernSlideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+          [data-theme="${theme}"] .pedido-row-enter { animation: modernSlideUp 0.18s ease-out; }
           ::-webkit-scrollbar { width: 3px; height: 3px; }
           ::-webkit-scrollbar-thumb { background: ${S.border}; border-radius: 3px; }
+        ` : ''}
+        ${theme === 'tablet' ? `
+          [data-theme="tablet"] button { min-height: 48px; }
+          [data-theme="tablet"] { font-size: 15px; }
         ` : ''}
       `}</style>
 
@@ -878,10 +905,63 @@ window.__App = function CantinaFull() {
               {new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
             </div>
             {loginUser && <div style={{ padding: "4px 10px", borderRadius: 8, background: S.accent + "20", border: `1px solid ${S.accent}40`, fontSize: 10, fontWeight: 800, color: S.accent }}>{loginUser.nombre}</div>}
-            <button onClick={toggleTheme} title="Cambiar a Clásico" style={{ width: 34, height: 34, borderRadius: 9, border: `1px solid ${S.border}`, background: S.surfaceHover, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, color: S.muted }}>🌙</button>
+            <button onClick={toggleTheme} title="Cambiar a Clásico" style={{ width: 34, height: 34, borderRadius: 9, border: `1px solid ${S.border}`, background: S.surfaceHover, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, color: S.muted }}>☀️</button>
           </div>
         </div>
-      ) : (
+      ) : theme === 'tablet' ? (() => {
+        const pedidosSinEntregar = pedidos.filter(p => p.estado === "listo" && !p.solo_despacho).length;
+        const pedidosSinCobrar = pedidos.filter(p => !p.cobrado && !p.solo_despacho && p.estado !== 'cancelado').length;
+        const pedidosCocina = pedidos.filter(p => ["pendiente", "en_preparacion"].includes(p.estado) && !p.solo_despacho).length;
+        const mesasConPago = Array.from({ length: MESAS_TOTAL }, (_, i) => i + 1).some(n => pedidosMesa(n).some(p => !p.cobrado && p.estado === "entregado"));
+        return (
+          <div style={{ height: 54, background: S.surface, borderBottom: `1px solid ${S.border}`, flexShrink: 0, display: "flex", alignItems: "center", padding: "0 10px", gap: 6 }}>
+            <div style={{ flex: 1, display: "flex", gap: 2, overflowX: "auto" }}>
+              {[
+                ["venta",     "🛒 Venta"],
+                ["mesas",     "🪑 Mesas"],
+                ["cocina",    "👨‍🍳 Cocina"],
+                ["pedidos",   "📋 Pedidos"],
+                ["caja",      "💰 Caja"],
+                ["clientes",  "👥 Clientes"],
+                ["productos", "📦 Productos"],
+              ].map(([key, label]) => {
+                let badge = null, badgeBg = S.danger, badgeColor = "#fff";
+                if (key === "mesas" && mesasConPago) { badge = "!"; }
+                if (key === "cocina" && pedidosCocina > 0) { badge = pedidosCocina; badgeBg = S.warning; badgeColor = "#000"; }
+                if (key === "pedidos" && pedidosSinEntregar > 0) { badge = pedidosSinEntregar; badgeBg = S.success; badgeColor = "#000"; }
+                if (key === "caja" && pedidosSinCobrar > 0) { badge = pedidosSinCobrar; }
+                return (
+                  <button key={key} onClick={() => setTab(key)} style={{ padding: "8px 10px", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 800, background: tab === key ? S.accent : "transparent", color: tab === key ? "#fff" : S.muted, cursor: "pointer", transition: "all 0.15s", position: "relative", whiteSpace: "nowrap", flexShrink: 0 }}>
+                    {label}
+                    {badge !== null && (
+                      <span style={{ marginLeft: 4, padding: "1px 5px", borderRadius: 6, background: badgeBg, color: badgeColor, fontSize: 10, fontWeight: 900, display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 16, height: 16 }}>{badge}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, fontWeight: 700, color: S.text }}>
+                {new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
+              </div>
+              {loginUser && <div style={{ padding: "4px 8px", borderRadius: 8, background: S.accent + "20", border: `1px solid ${S.accent}40`, fontSize: 10, fontWeight: 800, color: S.accent }}>{loginUser.nombre}</div>}
+              <div style={{ position: "relative" }}>
+                <button onClick={() => setTabletMenuOpen(v => !v)} style={{ width: 38, height: 38, borderRadius: 10, border: `1px solid ${tabletMenuOpen ? S.accent : S.border}`, background: tabletMenuOpen ? S.accent + "20" : S.surfaceHover, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>⚙️</button>
+                {tabletMenuOpen && (
+                  <>
+                    <div onClick={() => setTabletMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 998 }} />
+                    <div style={{ position: "absolute", right: 0, top: 44, zIndex: 999, background: S.surface, border: `1px solid ${S.border}`, borderRadius: 12, padding: "6px", minWidth: 190, boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}>
+                      <button onClick={() => { setTab("dashboard"); setTabletMenuOpen(false); }} style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", textAlign: "left", fontSize: 14, fontWeight: 700, color: S.text }}>📊 Sistema</button>
+                      <div style={{ height: 1, background: S.border, margin: "4px 0" }} />
+                      <button onClick={() => { toggleTheme(); setTabletMenuOpen(false); }} style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", textAlign: "left", fontSize: 14, fontWeight: 700, color: S.muted }}>🌙 Cambiar a Moderno</button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })() : (
         /* CLASSIC: Full tab bar */
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 20px", height: 56, background: S.surface, borderBottom: `1px solid ${S.border}`, flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -912,7 +992,7 @@ window.__App = function CantinaFull() {
               ["dashboard", "📊 Sistema"],
             ].map(([key, label]) => {
               const pedidosSinEntregar = pedidos.filter(p => p.estado === "listo" && !p.solo_despacho).length;
-              const pedidosSinCobrar = pedidos.filter(p => !p.cobrado && !p.solo_despacho).length;
+              const pedidosSinCobrar = pedidos.filter(p => !p.cobrado && !p.solo_despacho && p.estado !== 'cancelado').length;
               const pedidosCocina = pedidos.filter(p => ["pendiente", "en_preparacion"].includes(p.estado) && !p.solo_despacho).length;
               return (
               <button key={key} onClick={() => setTab(key)} style={{ padding: "8px 14px", borderRadius: 10, border: "none", fontSize: 12, fontWeight: 800, background: tab === key ? S.accent : "transparent", color: tab === key ? "#fff" : S.muted, cursor: "pointer", transition: "all 0.15s", position: "relative" }}>
@@ -933,8 +1013,8 @@ window.__App = function CantinaFull() {
               );
             })}
           </div>
-          <button onClick={toggleTheme} title="Cambiar a Moderno" style={{ width: 56, height: 30, borderRadius: 15, border: `1px solid ${S.border}`, background: S.surfaceHover, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4, fontSize: 11, fontWeight: 700, color: S.muted }}>
-            ☀️
+          <button onClick={toggleTheme} title="Cambiar a Tablet" style={{ width: 56, height: 30, borderRadius: 15, border: `1px solid ${S.border}`, background: S.surfaceHover, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4, fontSize: 11, fontWeight: 700, color: S.muted }}>
+            📱
           </button>
         </div>
       )}
@@ -963,7 +1043,8 @@ window.__App = function CantinaFull() {
           const enCarrito = carrito.find(i => i.producto_id === p.id);
           const stockBajo = p.stock <= p.stock_min && p.stock > 0;
           const sinStock = p.stock <= 0;
-          if (theme === 'modern') {
+          if (theme !== 'classic') {
+            const isTablet = theme === 'tablet';
             return (
               <button key={p.id} onClick={() => !sinStock && agregarItem(p)}
                 className={stockBajo ? "stock-low" : ""}
@@ -986,14 +1067,14 @@ window.__App = function CantinaFull() {
                     </div>
                   )}
                   {stockBajo && (
-                    <span style={{ position: "absolute", top: 12, left: 10, fontSize: 9, fontWeight: 900, color: S.danger, background: S.danger + "25", padding: "2px 6px", borderRadius: 6, letterSpacing: "0.05em" }}>POCO</span>
+                    <span style={{ position: "absolute", top: 12, left: 10, fontSize: isTablet ? 13 : 9, fontWeight: 900, color: S.danger, background: S.danger + "25", padding: isTablet ? "3px 8px" : "2px 6px", borderRadius: 6, letterSpacing: "0.05em" }}>POCO</span>
                   )}
-                  <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25, color: sinStock ? S.muted : S.text, textDecoration: sinStock ? "line-through" : "none", paddingRight: enCarrito ? 30 : 0 }}>{p.nombre}</div>
-                  <div style={{ fontSize: 19, fontWeight: 900, color: enCarrito ? cat.color : S.text, letterSpacing: "-0.01em" }}>${p.precio.toLocaleString()}</div>
+                  <div style={{ fontSize: 16, fontWeight: isTablet ? 500 : 700, lineHeight: 1.25, color: sinStock ? S.muted : isTablet ? "#E2E6F0" : S.text, textDecoration: sinStock ? "line-through" : "none", paddingRight: enCarrito ? 30 : 0 }}>{p.nombre}</div>
+                  <div style={{ fontSize: isTablet ? 18 : 19, fontWeight: isTablet ? 700 : 900, color: isTablet ? S.accent : (enCarrito ? cat.color : S.text), letterSpacing: "-0.01em" }}>${p.precio.toLocaleString()}</div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "auto" }}>
-                    <span style={{ fontSize: 11, color: stockBajo ? S.danger : S.muted, fontWeight: stockBajo ? 700 : 400 }}>Stock {p.stock}</span>
-                    {cat.despacho_directo && !p.cocina && <span style={{ fontSize: 9, fontWeight: 900, color: S.success, background: S.success + "20", padding: "2px 6px", borderRadius: 5 }}>⚡</span>}
-                    {p.cocina && <span style={{ fontSize: 9, fontWeight: 900, color: S.warning, background: S.warning + "20", padding: "2px 6px", borderRadius: 5 }}>🔥</span>}
+                    <span style={{ fontSize: isTablet ? 12 : 11, color: stockBajo ? S.danger : S.muted, fontWeight: stockBajo ? 700 : 400 }}>Stock {p.stock}</span>
+                    {cat.despacho_directo && !p.cocina && <span style={{ fontSize: isTablet ? 13 : 9, fontWeight: 900, color: S.success, background: S.success + "20", padding: isTablet ? "3px 8px" : "2px 6px", borderRadius: 5 }}>⚡</span>}
+                    {p.cocina && <span style={{ fontSize: isTablet ? 13 : 9, fontWeight: 900, color: S.warning, background: S.warning + "20", padding: isTablet ? "3px 8px" : "2px 6px", borderRadius: 5 }}>🔥</span>}
                   </div>
                 </div>
               </button>
@@ -1023,7 +1104,7 @@ window.__App = function CantinaFull() {
         };
 
         const cartPanel = (
-          <div style={{ width: theme === 'modern' ? "38%" : 320, display: "flex", flexDirection: "column", background: S.surface, overflow: "hidden", minHeight: 0, borderLeft: `1px solid ${S.border}` }}>
+          <div style={{ width: theme !== 'classic' ? "38%" : 320, display: "flex", flexDirection: "column", background: S.surface, overflow: "hidden", minHeight: 0, borderLeft: `1px solid ${S.border}` }}>
             {/* Order type */}
             <div style={{ padding: theme === 'modern' ? "16px 18px" : 16, borderBottom: `1px solid ${S.border}`, flexShrink: 0 }}>
               {theme === 'modern' ? (
@@ -1042,13 +1123,13 @@ window.__App = function CantinaFull() {
                 ))}
               </div>
               {tipoPedido === "mesa" && (
-                theme === 'modern' ? (
-                  <div ref={mesaInputRef} className={mesaFlash ? "flash-field" : ""} style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 5, maxHeight: 118, overflowY: "auto" }}>
+                theme !== 'classic' ? (
+                  <div ref={mesaInputRef} className={mesaFlash ? "flash-field" : ""} style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 5, maxHeight: theme === 'tablet' ? 162 : 118, overflowY: "auto" }}>
                     {Array.from({ length: MESAS_TOTAL }, (_, i) => i + 1).map(n => (
                       <button key={n} onClick={() => setMesaNum(String(n))} style={{
-                        height: 38, borderRadius: 9, border: `2px solid ${mesaNum === String(n) ? S.accent : S.border}`,
+                        height: theme === 'tablet' ? 48 : 38, borderRadius: 9, border: `2px solid ${mesaNum === String(n) ? S.accent : S.border}`,
                         background: mesaNum === String(n) ? S.accent : S.surfaceHover, color: mesaNum === String(n) ? "#fff" : S.text,
-                        fontSize: 13, fontWeight: 900, cursor: "pointer", boxShadow: mesaNum === String(n) ? `0 2px 8px ${S.accent}40` : "none",
+                        fontSize: theme === 'tablet' ? 16 : 13, fontWeight: 900, cursor: "pointer", boxShadow: mesaNum === String(n) ? `0 2px 8px ${S.accent}40` : "none",
                       }}>{n}</button>
                     ))}
                   </div>
@@ -1082,12 +1163,12 @@ window.__App = function CantinaFull() {
               ) : (
                 carrito.map(item => {
                   const cat = getCat(item.cat_id);
-                  const qBtnSize = theme === 'modern' ? 44 : 32;
+                  const qBtnSize = theme === 'tablet' ? 48 : theme === 'modern' ? 44 : 32;
                   return (
                     <div key={item.producto_id} className="anim-in" style={{ padding: theme === 'modern' ? "14px 0" : "12px 0", borderBottom: `1px solid ${S.border}` }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                        <span style={{ fontWeight: 700, fontSize: theme === 'modern' ? 14 : 13, color: S.text, flex: 1, lineHeight: 1.3 }}>{itemNombre(item)}</span>
-                        <span style={{ fontWeight: 900, fontSize: theme === 'modern' ? 15 : 13, color: S.accent, whiteSpace: "nowrap" }}>${(item.precio * item.cantidad).toLocaleString()}</span>
+                        <span style={{ fontWeight: 700, fontSize: theme === 'tablet' ? 15 : theme === 'modern' ? 14 : 13, color: S.text, flex: 1, lineHeight: 1.3 }}>{itemNombre(item)}</span>
+                        <span style={{ fontWeight: 900, fontSize: theme === 'tablet' ? 15 : theme === 'modern' ? 15 : 13, color: S.accent, whiteSpace: "nowrap" }}>${(item.precio * item.cantidad).toLocaleString()}</span>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: theme === 'modern' ? 10 : 8 }}>
                         <button onClick={() => quitarItem(item.producto_id)} style={{ width: qBtnSize, height: qBtnSize, borderRadius: 10, border: `1px solid ${S.border}`, background: S.surfaceHover, color: S.text, fontWeight: 900, cursor: "pointer", fontSize: 18, flexShrink: 0 }}>−</button>
@@ -1139,11 +1220,11 @@ window.__App = function CantinaFull() {
                 <span style={{ fontSize: theme === 'modern' ? 30 : 24, fontWeight: 900, color: S.text, letterSpacing: "-0.02em" }}>${total.toLocaleString()}</span>
               </div>
               <button onClick={enviarPedido} disabled={carrito.length === 0} style={{
-                width: "100%", padding: theme === 'modern' ? "16px 0" : "14px 0", borderRadius: 13, border: "none",
+                width: "100%", padding: theme !== 'classic' ? "16px 0" : "14px 0", borderRadius: 13, border: "none",
                 background: carrito.length === 0 ? S.border : soloDirecto ? S.success : S.accent,
                 color: carrito.length === 0 ? S.muted : soloDirecto ? "#000" : "#fff",
-                fontSize: theme === 'modern' ? 16 : 15, fontWeight: 900, cursor: carrito.length > 0 ? "pointer" : "not-allowed",
-                boxShadow: carrito.length > 0 && theme === 'modern' ? `0 4px 20px ${soloDirecto ? S.success : S.accent}50` : "none",
+                fontSize: theme !== 'classic' ? 16 : 15, fontWeight: 900, cursor: carrito.length > 0 ? "pointer" : "not-allowed",
+                boxShadow: carrito.length > 0 && theme !== 'classic' ? `0 4px 20px ${soloDirecto ? S.success : S.accent}50` : "none",
                 letterSpacing: "0.02em",
               }}>
                 {soloDirecto ? "⚡ DESPACHAR Y COBRAR" : "📤 ENVIAR A COCINA"}
@@ -1197,7 +1278,7 @@ window.__App = function CantinaFull() {
             return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
           });
         return (
-        <div style={{ flex: 1, overflow: "auto", padding: 24 }}>
+        <div style={{ flex: 1, overflow: "auto", padding: theme === 'tablet' ? 14 : 24 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: S.muted, letterSpacing: "0.08em" }}>
               PEDIDOS EN COCINA ({pedidosCocina.length})
@@ -1222,7 +1303,7 @@ window.__App = function CantinaFull() {
               <div style={{ fontSize: 13, marginTop: 6 }}>Los nuevos pedidos aparecerán acá</div>
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${theme === 'tablet' ? 240 : 320}px, 1fr))`, gap: 16 }}>
               {pedidosCocina.map(p => {
                 const isPendiente = p.estado === "pendiente";
                 const isPreparando = p.estado === "en_preparacion";
@@ -1240,9 +1321,9 @@ window.__App = function CantinaFull() {
                     border: `3px solid ${borderColor}`,
                   }}>
                     {/* Header */}
-                    <div style={{ padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", background: borderColor + "20", borderBottom: `2px solid ${borderColor}40` }}>
+                    <div style={{ padding: theme === 'tablet' ? "10px 14px" : "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", background: borderColor + "20", borderBottom: `2px solid ${borderColor}40` }}>
                       <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-                        <span style={{ fontSize: 32, fontWeight: 900, fontFamily: "'JetBrains Mono', monospace" }}>#{String(p.numero).padStart(3, "0")}</span>
+                        <span style={{ fontSize: 32, fontWeight: 900, fontFamily: "'JetBrains Mono', monospace" }}>{pedidoPrefix(p)}{String(p.numero).padStart(3, "0")}</span>
                         <span style={{ fontSize: 14, fontWeight: 800, color: borderColor }}>
                           {p.tipo === "mesa" ? `MESA ${p.mesa_numero}` : p.tipo === "barra" ? "BARRA" : "🛍️ LLEVAR"}
                         </span>
@@ -1256,9 +1337,9 @@ window.__App = function CantinaFull() {
                     </div>
 
                     {/* Items */}
-                    <div style={{ padding: "12px 20px" }}>
+                    <div style={{ padding: theme === 'tablet' ? "8px 14px" : "12px 20px" }}>
                       {itemsCocina.map((item, idx) => (
-                        <div key={idx} style={{ padding: "8px 0", borderBottom: idx < itemsCocina.length - 1 ? `1px solid ${S.border}` : "none", display: "flex", alignItems: "flex-start", gap: 12 }}>
+                        <div key={idx} style={{ padding: theme === 'tablet' ? "5px 0" : "8px 0", borderBottom: idx < itemsCocina.length - 1 ? `1px solid ${S.border}` : "none", display: "flex", alignItems: "flex-start", gap: 12 }}>
                           <div style={{ minWidth: 36, height: 36, borderRadius: 10, background: borderColor, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'JetBrains Mono', monospace", fontSize: 18, fontWeight: 900, color: "#000", flexShrink: 0 }}>
                             {item.cantidad}
                           </div>
@@ -1278,7 +1359,7 @@ window.__App = function CantinaFull() {
                     </div>
 
                     {/* Actions */}
-                    <div style={{ padding: "10px 20px 16px" }}>
+                    <div style={{ padding: theme === 'tablet' ? "6px 14px 10px" : "10px 20px 16px" }}>
                       {isPendiente && (
                         <button onClick={async () => {
                           const result = await apiFetch(`/pedidos/${p.id}`, { method: 'PUT', body: { estado: 'en_preparacion' } });
@@ -1328,46 +1409,172 @@ window.__App = function CantinaFull() {
         const selActiva = selPeds.length > 0;
         const selTotal = selActiva ? selPeds.filter(p => !p.cobrado).reduce((s, p) => s + p.total, 0) : 0;
 
+        // Tablet: status derivado por mesa
+        const getMesaStatus = (num) => {
+          const peds = pedidosMesa(num);
+          if (peds.length === 0) return 'libre';
+          const firstMs = Math.min(...peds.map(p => new Date(p.createdAt).getTime()));
+          if ((Date.now() - firstMs) / 60000 >= 30) return 'urgente';
+          if (peds.some(p => p.estado === 'entregado' && !p.cobrado)) return 'por_cobrar';
+          if (peds.some(p => p.estado === 'listo')) return 'lista';
+          return 'preparando';
+        };
+        const tblStatusOrder = { urgente: 0, por_cobrar: 1, lista: 2, preparando: 3, libre: 4 };
+        const mesasConInfo = Array.from({ length: MESAS_TOTAL }, (_, i) => i + 1)
+          .map(num => ({ num, status: getMesaStatus(num), peds: pedidosMesa(num) }))
+          .sort((a, b) => tblStatusOrder[a.status] - tblStatusOrder[b.status]);
+        const tblCounts = { urgente: 0, por_cobrar: 0, lista: 0, preparando: 0, libre: 0 };
+        mesasConInfo.forEach(m => tblCounts[m.status]++);
+        const tblOcupadas = tblCounts.urgente + tblCounts.por_cobrar + tblCounts.lista + tblCounts.preparando;
+        const mesasFiltradas = mesasTabFilter === 'todas' ? mesasConInfo
+          : mesasTabFilter === 'ocupadas' ? mesasConInfo.filter(m => m.status !== 'libre')
+          : mesasConInfo.filter(m => m.status === mesasTabFilter);
+        const tblCfg = {
+          urgente:    { label: '+30 min',    border: S.danger,  bg: S.danger   + '20', col: S.danger   },
+          por_cobrar: { label: 'Por cobrar', border: S.accent,  bg: S.accent   + '20', col: S.accent   },
+          lista:      { label: 'Listo',      border: S.success, bg: S.success  + '20', col: S.success  },
+          preparando: { label: 'Preparando', border: S.warning, bg: S.warning  + '20', col: S.warning  },
+          libre:      { label: 'Libre',      border: 'transparent', bg: 'transparent', col: S.muted    },
+        };
+
         return (
         <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
           {/* Left: mesa grid */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "12px 16px", overflow: "hidden" }}>
-            <div style={{ fontSize: 10, fontWeight: 800, color: S.muted, letterSpacing: "0.06em", marginBottom: 8 }}>
-              MESAS — {activas} ocupadas de {MESAS_TOTAL}
-            </div>
-            <div style={{ flex: 1, display: "flex", flexWrap: "wrap", gap: 6, alignContent: "flex-start", overflow: "auto" }}>
-              {Array.from({ length: MESAS_TOTAL }, (_, i) => i + 1).map(num => {
-                const peds = pedidosMesa(num);
-                const activa = peds.length > 0;
-                const pagoPend = peds.some(p => p.estado === "entregado" && !p.cobrado);
-                const enCocina = peds.some(p => ["pendiente", "en_preparacion"].includes(p.estado));
-                const tieneListos = peds.some(p => p.estado === "listo");
-                const isSelected = sel === num;
-                const bg = !activa ? S.border + "40" : pagoPend ? S.danger + "30" : tieneListos ? S.success + "30" : enCocina ? S.warning + "30" : S.accent + "20";
-                const brd = isSelected ? S.accent : !activa ? "transparent" : pagoPend ? S.danger : tieneListos ? S.success : enCocina ? S.warning : S.accent + "50";
-                const sz = activas <= 6 ? 76 : activas <= 12 ? 64 : activas <= 20 ? 56 : 48;
-                const fs = activas <= 6 ? 22 : activas <= 12 ? 18 : 16;
-
-                return (
-                  <button key={num} onClick={() => setMesaSeleccionada(isSelected ? null : num)}
-                    className={pagoPend && !isSelected ? "pago-pend" : ""}
-                    style={{
-                      width: sz, height: sz, borderRadius: 12, border: `3px solid ${brd}`,
-                      background: bg, cursor: "pointer", display: "flex", flexDirection: "column",
-                      alignItems: "center", justifyContent: "center", position: "relative",
-                      transition: "all 0.15s", transform: isSelected ? "scale(1.1)" : "scale(1)",
-                      boxShadow: isSelected ? `0 0 12px ${S.accent}40` : "none",
-                    }}>
-                    <span style={{ fontSize: fs, fontWeight: 900, color: activa ? S.text : S.muted, fontFamily: "'JetBrains Mono', monospace" }}>{num}</span>
-                    {activa && (
-                      <span style={{ fontSize: 7, fontWeight: 800, color: pagoPend ? S.danger : tieneListos ? S.success : enCocina ? S.warning : S.muted, marginTop: 1 }}>
-                        {pagoPend ? "💳" : tieneListos ? "✅" : enCocina ? "🔥" : "●"}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            {theme !== 'tablet' ? (
+              <>
+                <div style={{ padding: "12px 16px 4px", fontSize: 10, fontWeight: 800, color: S.muted, letterSpacing: "0.06em", flexShrink: 0 }}>
+                  MESAS — {activas} ocupadas de {MESAS_TOTAL}
+                </div>
+                <div style={{ flex: 1, display: "flex", flexWrap: "wrap", gap: 6, alignContent: "flex-start", overflow: "auto", padding: "8px 16px 12px" }}>
+                  {Array.from({ length: MESAS_TOTAL }, (_, i) => i + 1).map(num => {
+                    const peds = pedidosMesa(num);
+                    const activa = peds.length > 0;
+                    const pagoPend = peds.some(p => p.estado === "entregado" && !p.cobrado);
+                    const enCocina = peds.some(p => ["pendiente", "en_preparacion"].includes(p.estado));
+                    const tieneListos = peds.some(p => p.estado === "listo");
+                    const isSelected = sel === num;
+                    const bg = !activa ? S.border + "40" : pagoPend ? S.danger + "30" : tieneListos ? S.success + "30" : enCocina ? S.warning + "30" : S.accent + "20";
+                    const brd = isSelected ? S.accent : !activa ? "transparent" : pagoPend ? S.danger : tieneListos ? S.success : enCocina ? S.warning : S.accent + "50";
+                    const sz = activas <= 6 ? 76 : activas <= 12 ? 64 : activas <= 20 ? 56 : 48;
+                    const fs = activas <= 6 ? 22 : activas <= 12 ? 18 : 16;
+                    return (
+                      <button key={num} onClick={() => setMesaSeleccionada(isSelected ? null : num)}
+                        className={pagoPend && !isSelected ? "pago-pend" : ""}
+                        style={{
+                          width: sz, height: sz, borderRadius: 12, border: `3px solid ${brd}`,
+                          background: bg, cursor: "pointer", display: "flex", flexDirection: "column",
+                          alignItems: "center", justifyContent: "center", position: "relative",
+                          transition: "all 0.15s", transform: isSelected ? "scale(1.1)" : "scale(1)",
+                          boxShadow: isSelected ? `0 0 12px ${S.accent}40` : "none",
+                        }}>
+                        <span style={{ fontSize: fs, fontWeight: 900, color: activa ? S.text : S.muted, fontFamily: "'JetBrains Mono', monospace" }}>{num}</span>
+                        {activa && (
+                          <span style={{ fontSize: 7, fontWeight: 800, color: pagoPend ? S.danger : tieneListos ? S.success : enCocina ? S.warning : S.muted, marginTop: 1 }}>
+                            {pagoPend ? "💳" : tieneListos ? "✅" : enCocina ? "🔥" : "●"}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Tablet: stats + filtros */}
+                <div style={{ padding: "10px 14px", borderBottom: `1px solid ${S.border}`, flexShrink: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: S.muted, letterSpacing: "0.06em" }}>
+                      MESAS — {tblOcupadas} ocupadas de {MESAS_TOTAL}
+                    </span>
+                    {tblCounts.urgente > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: S.danger }}>● {tblCounts.urgente} urgentes</span>}
+                    {tblCounts.preparando > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: S.warning }}>● {tblCounts.preparando} preparando</span>}
+                    {tblCounts.lista > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: S.success }}>● {tblCounts.lista} listas</span>}
+                    {tblCounts.por_cobrar > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: S.accent }}>● {tblCounts.por_cobrar} por cobrar</span>}
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {[
+                      { key: "todas", label: `Todas ${MESAS_TOTAL}` },
+                      { key: "ocupadas", label: `Ocupadas ${tblOcupadas}`, color: S.warning },
+                      { key: "lista", label: `Listas ${tblCounts.lista}`, color: S.success },
+                      { key: "por_cobrar", label: `Cobrar ${tblCounts.por_cobrar}`, color: S.accent },
+                      tblCounts.urgente > 0 ? { key: "urgente", label: `Urgentes ${tblCounts.urgente}`, color: S.danger } : null,
+                    ].filter(Boolean).map(({ key, label, color }) => (
+                      <button key={key} onClick={() => setMesasTabFilter(key)}
+                        style={{ padding: "5px 10px", borderRadius: 8,
+                          border: `1px solid ${mesasTabFilter === key ? (color || S.accent) : S.border}`,
+                          background: mesasTabFilter === key ? (color || S.accent) + "20" : "transparent",
+                          color: mesasTabFilter === key ? (color || S.accent) : S.muted,
+                          fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* Tablet: card grid */}
+                <div style={{ flex: 1, overflow: "auto", padding: "10px 14px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))", gap: 8 }}>
+                    {mesasFiltradas.map(({ num, status, peds: mPeds }) => {
+                      const cfg = tblCfg[status];
+                      const isLibre = status === 'libre';
+                      const allItems = mPeds.flatMap(p => p.items);
+                      const mTotal = mPeds.reduce((s, p) => s + p.total, 0);
+                      const firstMs = mPeds.length ? Math.min(...mPeds.map(p => new Date(p.createdAt).getTime())) : null;
+                      const eMin = firstMs ? Math.floor((Date.now() - firstMs) / 60000) : 0;
+                      const eSec = firstMs ? Math.floor((Date.now() - firstMs) / 1000) % 60 : 0;
+                      const timerCol = eMin >= 30 ? S.danger : eMin >= 15 ? S.warning : S.muted;
+                      const merged = [];
+                      allItems.forEach(item => {
+                        const ex = merged.find(m => m.producto_id === item.producto_id);
+                        if (ex) ex.cantidad += item.cantidad; else merged.push({ ...item });
+                      });
+                      const shown = merged.slice(0, 3);
+                      const extra = merged.length - 3;
+                      return (
+                        <button key={num}
+                          onClick={() => setMesaSeleccionada(mesaSeleccionada === num ? null : num)}
+                          className={status === 'urgente' ? "pago-pend" : ""}
+                          style={{
+                            textAlign: "left", padding: "10px", borderRadius: 12, cursor: "pointer",
+                            border: `1px solid ${S.border}`,
+                            borderLeft: isLibre ? `1px solid ${S.border}` : `3px solid ${cfg.border}`,
+                            background: S.surface, opacity: isLibre ? 0.35 : 1,
+                            display: "flex", flexDirection: "column", gap: 4,
+                            minHeight: isLibre ? 44 : "auto",
+                            outline: mesaSeleccionada === num ? `2px solid ${S.accent}` : "none",
+                            outlineOffset: 2,
+                          }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
+                            <span style={{ fontSize: 20, fontWeight: 900, fontFamily: "'JetBrains Mono', monospace", color: status === 'lista' ? S.success : S.text, lineHeight: 1 }}>{num}</span>
+                            {!isLibre && (
+                              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: cfg.bg, color: cfg.col, whiteSpace: "nowrap" }}>
+                                {cfg.label}
+                              </span>
+                            )}
+                          </div>
+                          {!isLibre && (
+                            <>
+                              <div style={{ fontSize: 11, color: "#E2E6F0", lineHeight: 1.5 }}>
+                                {shown.map((item, idx) => (
+                                  <div key={idx} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {item.cantidad}× {itemNombre(item)}
+                                  </div>
+                                ))}
+                                {extra > 0 && <div style={{ color: S.muted, fontSize: 10 }}>+{extra} {extra === 1 ? "item" : "items"}</div>}
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2, paddingTop: 6, borderTop: `1px solid ${S.border}` }}>
+                                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 700, color: timerCol }}>⏱ {eMin}:{String(eSec).padStart(2, "0")}</span>
+                                <span style={{ fontSize: 12, fontWeight: 800, color: S.accent }}>${mTotal.toLocaleString()}</span>
+                              </div>
+                            </>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Right: detail panel */}
@@ -1381,6 +1588,22 @@ window.__App = function CantinaFull() {
                     <span style={{ fontSize: 28, fontWeight: 900, fontFamily: "'JetBrains Mono', monospace", color: S.text }}>{String(sel).padStart(2, "0")}</span>
                   </div>
                   <button onClick={() => setMesaSeleccionada(null)} style={{ padding: "6px 12px", borderRadius: 8, border: `1px solid ${S.border}`, background: "transparent", color: S.muted, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>✕</button>
+                </div>
+                {/* Mozo assignment */}
+                <div style={{ padding: "6px 14px", borderBottom: `1px solid ${S.border}`, display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", flexShrink: 0 }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, color: S.muted }}>👤</span>
+                  <button onClick={() => asignarMozo(sel, null)} title="Sin mozo"
+                    style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${!mesasMozos[sel] ? S.accent : S.border}`, background: !mesasMozos[sel] ? S.accent : "transparent", color: !mesasMozos[sel] ? "#fff" : S.muted, fontSize: 11, fontWeight: 800, cursor: "pointer", lineHeight: 1 }}>—</button>
+                  {usuarios.map(u => {
+                    const isAssigned = mesasMozos[sel] === u.id;
+                    return (
+                      <button key={u.id} onClick={() => asignarMozo(sel, u.id)} title={u.nombre}
+                        style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${isAssigned ? S.accent : S.border}`, background: isAssigned ? S.accent : S.bg, color: isAssigned ? "#fff" : S.text, fontSize: 11, fontWeight: 800, cursor: "pointer", lineHeight: 1 }}>
+                        {u.nombre[0].toUpperCase()}
+                      </button>
+                    );
+                  })}
+                  {mesasMozos[sel] && <span style={{ fontSize: 11, color: S.info, fontWeight: 700, marginLeft: 2 }}>{usuarios.find(u => u.id === mesasMozos[sel])?.nombre}</span>}
                 </div>
 
                 {selActiva ? (
@@ -1408,7 +1631,7 @@ window.__App = function CantinaFull() {
                     {/* Pedidos */}
                     {selPeds.map(p => (
                       <div key={p.id} style={{ marginBottom: 8, padding: "8px 10px", borderRadius: 8, background: S.bg, border: `1px solid ${S.border}` }}>
-                        <div style={{ fontSize: 10, fontWeight: 800, color: S.muted, marginBottom: 3 }}>#{String(p.numero).padStart(3, "0")}</div>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: S.muted, marginBottom: 3 }}>{pedidoPrefix(p)}{String(p.numero).padStart(3, "0")}</div>
                         <div style={{ fontSize: 12, color: S.text, lineHeight: 1.5 }}>
                           {p.items.map(i => `${i.cantidad}x ${itemNombre(i)}`).join(" · ")}
                         </div>
@@ -1465,8 +1688,8 @@ window.__App = function CantinaFull() {
         const estadoLabel = { pendiente: "COCINA", en_preparacion: "PREPARANDO", listo: "LISTO ✓", entregado: "ENTREGADO", cancelado: "CANCELADO" };
         const estadoColor = e => e === "pendiente" ? S.danger : e === "en_preparacion" ? S.warning : e === "listo" ? S.success : e === "cancelado" ? S.danger : S.muted;
 
-        if (theme === 'modern') {
-          // Group pedidos by urgency for modern view
+        if (theme !== 'classic') {
+          // Group pedidos by urgency for modern/tablet view
           const grupos = [
             { id: "listo", label: "✅ LISTOS PARA COBRAR", color: S.success, items: pedidos.filter(p => p.estado === "listo" && !p.cobrado) },
             { id: "activos", label: "🔥 EN COCINA", color: S.warning, items: pedidos.filter(p => ["pendiente", "en_preparacion"].includes(p.estado)) },
@@ -1501,15 +1724,15 @@ window.__App = function CantinaFull() {
                         <div style={{ width: 5, alignSelf: "stretch", borderRadius: 3, background: ec, flexShrink: 0 }} />
                         {/* Order number */}
                         <div style={{ minWidth: 52, textAlign: "center", flexShrink: 0 }}>
-                          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 22, fontWeight: 900, color: S.text, lineHeight: 1 }}>#{String(p.numero).padStart(3, "0")}</div>
-                          <div style={{ fontSize: 10, color: S.muted, fontWeight: 600, marginTop: 2 }}>
+                          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: theme === 'tablet' ? 24 : 22, fontWeight: 900, color: S.text, lineHeight: 1 }}>{pedidoPrefix(p)}{String(p.numero).padStart(3, "0")}</div>
+                          <div style={{ fontSize: theme === 'tablet' ? 12 : 10, color: S.muted, fontWeight: 600, marginTop: 2 }}>
                             {p.tipo === "mesa" ? `Mesa ${p.mesa_numero}` : p.tipo === "barra" ? "Barra" : "Llevar"}
                           </div>
                         </div>
                         {/* Items + client */}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           {p.nombre_cliente && <div style={{ fontSize: 12, fontWeight: 700, color: S.info, marginBottom: 4 }}>📢 {p.nombre_cliente}</div>}
-                          <div style={{ fontSize: 13, color: S.text, lineHeight: 1.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          <div style={{ fontSize: theme === 'tablet' ? 14 : 13, color: theme === 'tablet' ? "#E2E6F0" : S.text, lineHeight: 1.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {p.items.map((it, idx) => (
                               <span key={idx}><span style={{ fontWeight: 800 }}>{it.cantidad}×</span> {itemNombre(it)}{idx < p.items.length - 1 ? " · " : ""}</span>
                             ))}
@@ -1574,7 +1797,7 @@ window.__App = function CantinaFull() {
                       style={{ padding: 16, borderRadius: 14, background: S.surface, border: `2px solid ${pedidosActualizados.has(p.id) ? S.info : S.border}`, transition: "border-color 0.3s", cursor: "default" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                          <span style={{ fontWeight: 900, fontSize: 16 }}>#{String(p.numero).padStart(3, "0")}</span>
+                          <span style={{ fontWeight: 900, fontSize: 16 }}>{pedidoPrefix(p)}{String(p.numero).padStart(3, "0")}</span>
                           {p.nombre_cliente && <span style={{ fontSize: 13, fontWeight: 700, color: S.info }}>📢 {p.nombre_cliente}</span>}
                           {p.solo_despacho && <span style={{ fontSize: 10, fontWeight: 900, padding: "2px 8px", borderRadius: 6, background: S.success + "25", color: S.success }}>Directa</span>}
                           {pedidosActualizados.has(p.id) && <span className="pulse-blue" style={{ fontSize: 10, fontWeight: 900, padding: "2px 8px", borderRadius: 6, background: S.info, color: "#fff" }}>● actualizado</span>}
@@ -1757,7 +1980,12 @@ window.__App = function CantinaFull() {
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {clientes.map(c => {
+              {[...clientes].sort((a, b) => {
+                if (a.saldo > 0 && b.saldo === 0) return -1;
+                if (a.saldo === 0 && b.saldo > 0) return 1;
+                if (a.saldo > 0 && b.saldo > 0) return b.saldo - a.saldo;
+                return a.nombre.localeCompare(b.nombre, 'es');
+              }).map(c => {
                 const pagosCliente = clientePagos.filter(p => p.cliente_id === c.id);
                 const comprasCliente = pedidos.filter(p => p.cliente_id === c.id && p.cobrado);
                 const isExpanded = clienteExpandido === c.id;
@@ -2127,7 +2355,7 @@ window.__App = function CantinaFull() {
                         </div>
                         {/* Stock +/- controls */}
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <button onClick={() => setProductos(prev => prev.map(x => x.id === p.id ? { ...x, stock: Math.max(0, x.stock - 1) } : x))} style={{
+                          <button onClick={async () => { const ns = Math.max(0, p.stock - 1); setProductos(prev => prev.map(x => x.id === p.id ? { ...x, stock: ns } : x)); await apiFetch(`/productos/${p.id}`, { method: 'PUT', body: { nombre: p.nombre, precio: p.precio, stock: ns, cat_id: p.cat_id, cocina: p.cocina } }); }} style={{
                             width: 32, height: 32, borderRadius: 8, border: `1px solid ${S.border}`, background: S.bg,
                             color: S.text, fontSize: 16, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
                           }}>−</button>
@@ -2136,7 +2364,7 @@ window.__App = function CantinaFull() {
                               background: S.bg, color: stockBajo ? S.danger : S.text, fontSize: 15, fontWeight: 800, textAlign: "center",
                               cursor: "pointer",
                             }}>{p.stock}</button>
-                          <button onClick={() => setProductos(prev => prev.map(x => x.id === p.id ? { ...x, stock: x.stock + 1 } : x))} style={{
+                          <button onClick={async () => { const ns = p.stock + 1; setProductos(prev => prev.map(x => x.id === p.id ? { ...x, stock: ns } : x)); await apiFetch(`/productos/${p.id}`, { method: 'PUT', body: { nombre: p.nombre, precio: p.precio, stock: ns, cat_id: p.cat_id, cocina: p.cocina } }); }} style={{
                             width: 32, height: 32, borderRadius: 8, border: `1px solid ${S.border}`, background: S.bg,
                             color: S.success, fontSize: 16, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
                           }}>+</button>
@@ -2188,13 +2416,13 @@ window.__App = function CantinaFull() {
           </div>
 
           {/* Pending payments */}
-          {pedidos.filter(p => !p.cobrado && !p.solo_despacho).length > 0 && (
+          {pedidos.filter(p => !p.cobrado && !p.solo_despacho && p.estado !== 'cancelado').length > 0 && (
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: S.danger, letterSpacing: "0.08em", marginBottom: 12 }}>
-                ⚠️ COBROS PENDIENTES ({pedidos.filter(p => !p.cobrado && !p.solo_despacho).length})
+                ⚠️ COBROS PENDIENTES ({pedidos.filter(p => !p.cobrado && !p.solo_despacho && p.estado !== 'cancelado').length})
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
-                {pedidos.filter(p => !p.cobrado && !p.solo_despacho).map(p => (
+                {pedidos.filter(p => !p.cobrado && !p.solo_despacho && p.estado !== 'cancelado').map(p => (
                   <div key={p.id} className="pulse-border" style={{ padding: 14, borderRadius: 12, background: S.surface, border: `2px solid ${S.danger}40` }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div>
@@ -2227,7 +2455,7 @@ window.__App = function CantinaFull() {
                 <div key={i} style={{ display: "flex", alignItems: "center", padding: "12px 16px", borderRadius: 10, background: S.surface, border: `1px solid ${S.border}` }}>
                   <span style={{ fontSize: 20, marginRight: 12 }}>{m.metodo === "efectivo" ? "💵" : m.metodo === "transferencia" ? "📱" : "📋"}</span>
                   <div style={{ flex: 1 }}>
-                    <span style={{ fontWeight: 700, fontSize: 13 }}>Pedido #{String(m.pedido_num).padStart(3, "0")}</span>
+                    <span style={{ fontWeight: 700, fontSize: 13 }}>{m.pedido_num != null ? `Pedido #${String(m.pedido_num).padStart(3, "0")}` : m.referencia || "Pago fiado"}</span>
                     <span style={{ fontSize: 11, color: S.muted, marginLeft: 8 }}>{m.metodo === "efectivo" ? "Efectivo" : m.metodo === "transferencia" ? "Transferencia" : "Cuenta corriente"}</span>
                     {m.referencia && <span style={{ fontSize: 10, color: S.info, marginLeft: 6 }}>Ref: {m.referencia}</span>}
                   </div>
@@ -2330,8 +2558,9 @@ window.__App = function CantinaFull() {
                   <button onClick={() => setCierreCaja(null)} style={{ flex: 1, padding: "12px 0", borderRadius: 12, border: `1px solid ${S.border}`, background: "transparent", color: S.muted, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                     Cerrar
                   </button>
-                  <button onClick={() => {
+                  <button onClick={async () => {
                     const cierreConArqueo = { ...cierreCaja, arqueoEfectivo: arqueoEfectivo.length > 0 ? Number(arqueoEfectivo) : null, diferencia: arqueoEfectivo.length > 0 ? Number(arqueoEfectivo) - cierreCaja.efectivo : null };
+                    apiFetch('/cierres', { method: 'POST', body: { efectivo: cierreConArqueo.efectivo, transferencia: cierreConArqueo.transferencia, fiado: cierreConArqueo.fiado, totalVentas: cierreConArqueo.totalVentas, cantPedidos: cierreConArqueo.cantPedidos, arqueo: cierreConArqueo.arqueoEfectivo, diferencia: cierreConArqueo.diferencia } });
                     descargarCierreHtml(cierreConArqueo);
                     setCierresHistorial(prev => [...prev, { ...cierreConArqueo, id: Date.now() }]);
                     setCierreCaja(null);
@@ -2531,20 +2760,23 @@ window.__App = function CantinaFull() {
         const pinCorrecto = pinModal.pin === PIN_CORRECTO;
         const pinIncorrecto = pinCompleto && !pinCorrecto;
 
-        const doAction = () => {
+        const doAction = async () => {
           if (pinModal.action === "eliminar" && cli) {
+            await apiFetch(`/clientes/${cli.id}`, { method: 'PUT', body: { activo: false } });
             setClientes(prev => prev.filter(x => x.id !== cli.id));
             showMsg("🗑 Cliente eliminado");
           } else if (pinModal.action === "pagar" && cli) {
             const monto = pinModal.pagoMonto;
-            setClientes(prev => prev.map(c => c.id === cli.id ? { ...c, saldo: c.saldo - monto } : c));
+            const result = await apiFetch(`/clientes/${cli.id}/pago`, { method: 'POST', body: { monto } });
+            setClientes(prev => prev.map(c => c.id === cli.id ? { ...c, saldo: result ? result.saldo : Math.max(0, c.saldo - monto) } : c));
             setClientePagos(prev => [...prev, { id: Date.now(), cliente_id: cli.id, monto, fecha: new Date().toISOString() }]);
             setCajaMovimientos(prev => [...prev, { tipo: "pago_fiado", metodo: "efectivo", monto, pedido_num: null, referencia: `Pago ${cli.nombre} ${cli.apellido}`, ts: new Date().toISOString() }]);
-            showMsg(`✅ Pago de $${monto.toLocaleString()} registrado`);
+            showMsg(result ? `✅ Pago de $${monto.toLocaleString()} registrado` : "❌ Error al registrar pago");
             setPagoForm(null);
           } else if (pinModal.action === "cancelar") {
             ejecutarCancelar(pinModal.pedidoId);
           } else if (pinModal.action === "eliminarUsuario") {
+            await apiFetch(`/usuarios/${pinModal.userId}`, { method: 'DELETE' });
             setUsuarios(prev => prev.filter(u => u.id !== pinModal.userId));
             showMsg("🗑 Usuario eliminado");
           }
@@ -2637,7 +2869,7 @@ window.__App = function CantinaFull() {
                 {new Date(ticketVisible.createdAt).toLocaleDateString("es-AR")} · {new Date(ticketVisible.createdAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
               </div>
               <div style={{ fontSize: 13, fontWeight: 700, marginTop: 4 }}>
-                Pedido #{String(ticketVisible.numero).padStart(3, "0")}
+                Pedido {pedidoPrefix(ticketVisible)}{String(ticketVisible.numero).padStart(3, "0")}
                 {ticketVisible.tipo === "mesa" && ` · Mesa ${ticketVisible.mesa_numero}`}
               </div>
             </div>
@@ -2984,20 +3216,20 @@ window.__App = function CantinaFull() {
           <div style={{ display: "flex", gap: 10, flex: "0 0 auto" }}>
             {/* Services grid */}
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: S.muted, letterSpacing: "0.06em", marginBottom: 6 }}>SERVICIOS</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: S.muted, letterSpacing: "0.06em", marginBottom: 6 }}>SERVICIOS</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 6 }}>
                 {services.map(s => (
-                  <div key={s.k} style={{ padding: "8px 4px", borderRadius: 10, background: S.surface, border: `1px solid ${s.online ? S.success + "25" : S.danger + "40"}`, textAlign: "center" }}>
-                    <div style={{ fontSize: 18, marginBottom: 2 }}>{s.icon}</div>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: S.text }}>{s.nombre}</div>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 3, marginTop: 3 }}>
-                      <div style={{ width: 5, height: 5, borderRadius: "50%", background: s.online ? S.success : S.danger }} />
-                      <span style={{ fontSize: 8, fontWeight: 800, color: s.online ? S.success : S.danger }}>{s.online ? "OK" : "OFF"}</span>
+                  <div key={s.k} style={{ padding: "10px 4px", borderRadius: 10, background: S.surface, border: `1px solid ${s.online ? S.success + "25" : S.danger + "40"}`, textAlign: "center" }}>
+                    <div style={{ fontSize: 26, marginBottom: 4 }}>{s.icon}</div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: S.text }}>{s.nombre}</div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, marginTop: 4 }}>
+                      <div style={{ width: 7, height: 7, borderRadius: "50%", background: s.online ? S.success : S.danger }} />
+                      <span style={{ fontSize: 11, fontWeight: 800, color: s.online ? S.success : S.danger }}>{s.online ? "OK" : "OFF"}</span>
                     </div>
                     {["postgres", "api", "frontend"].includes(s.k) && (
                       <button onClick={async () => { const svc = s.k === "postgres" ? "postgresql" : "cantina-api"; showMsg("🔄 Reiniciando " + s.nombre + "..."); await apiFetch(`/system/restart/${svc}`, { method: 'POST' }); showMsg("✅ " + s.nombre + " reiniciado"); }} style={{
-                        marginTop: 4, padding: "3px 0", width: "100%", borderRadius: 5, border: "none",
-                        background: S.border, color: S.muted, fontSize: 8, fontWeight: 700, cursor: "pointer",
+                        marginTop: 5, padding: "4px 0", width: "100%", borderRadius: 5, border: "none",
+                        background: S.border, color: S.muted, fontSize: 11, fontWeight: 700, cursor: "pointer",
                       }}>🔄 Reiniciar</button>
                     )}
                   </div>
@@ -3056,15 +3288,15 @@ window.__App = function CantinaFull() {
               <div key={m.label} style={{ flex: 1, borderRadius: 12, background: S.surface, border: `1px solid ${m.pct !== null && m.pct > 85 ? m.color + "50" : S.border}`, padding: "10px 10px 8px", display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div>
-                    <div style={{ fontSize: 9, fontWeight: 800, color: S.muted, letterSpacing: "0.07em" }}>{m.label}</div>
-                    <div style={{ fontSize: 17, fontWeight: 900, color: m.pct !== null ? m.color : S.text, lineHeight: 1.2, marginTop: 1 }}>{m.value}</div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: S.muted, letterSpacing: "0.07em" }}>{m.label}</div>
+                    <div style={{ fontSize: 19, fontWeight: 900, color: m.pct !== null ? m.color : S.text, lineHeight: 1.2, marginTop: 1 }}>{m.value}</div>
                   </div>
-                  <span style={{ fontSize: 16, opacity: 0.5 }}>{m.icon}</span>
+                  <span style={{ fontSize: 20, opacity: 0.5 }}>{m.icon}</span>
                 </div>
                 <div style={{ flex: 1, minHeight: 52, marginTop: 2 }}>
                   {m.chartData.length >= 2
                     ? React.createElement(SysChart, { data: m.chartData, color: m.color, maxY: m.maxY, unit: m.unit })
-                    : <div style={{ height: 52, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: S.muted }}>Esperando datos…</div>
+                    : <div style={{ height: 52, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: S.muted }}>Esperando datos…</div>
                   }
                 </div>
                 {m.pct !== null && (
@@ -3073,7 +3305,7 @@ window.__App = function CantinaFull() {
                   </div>
                 )}
                 {m.extra && (
-                  <button onClick={async () => { await apiFetch('/system/clear-cache', { method: 'POST' }); showMsg("✅ RAM liberada"); }} style={{ padding: "3px 0", borderRadius: 5, border: "none", background: S.warning + "20", color: S.warning, fontSize: 9, fontWeight: 800, cursor: "pointer" }}>
+                  <button onClick={async () => { await apiFetch('/system/clear-cache', { method: 'POST' }); showMsg("✅ RAM liberada"); }} style={{ padding: "4px 0", borderRadius: 5, border: "none", background: S.warning + "20", color: S.warning, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
                     🧹 Liberar cache
                   </button>
                 )}
@@ -3084,18 +3316,18 @@ window.__App = function CantinaFull() {
           {/* Row 2b: Server info strip */}
           <div style={{ display: "flex", gap: 8, flex: "0 0 auto", alignItems: "center", padding: "8px 12px", borderRadius: 10, background: S.surface, border: `1px solid ${S.border}` }}>
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: pgOk ? S.success : S.danger, boxShadow: `0 0 6px ${pgOk ? S.success : S.danger}`, flexShrink: 0 }} />
-            <span style={{ fontSize: 12, fontWeight: 800, color: pgOk ? S.success : S.danger }}>{pgOk ? "Sistema Online" : "BD Offline"}</span>
-            <div style={{ width: 1, height: 14, background: S.border, margin: "0 4px" }} />
-            <span style={{ fontSize: 11, color: S.muted }}>🌐</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: S.text, fontFamily: "'JetBrains Mono', monospace" }}>{ip}</span>
-            <div style={{ width: 1, height: 14, background: S.border, margin: "0 4px" }} />
-            <span style={{ fontSize: 11, color: S.muted }}>⏱️</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: S.text }}>{uptime}</span>
-            <div style={{ width: 1, height: 14, background: S.border, margin: "0 4px" }} />
-            <span style={{ fontSize: 11, color: S.muted }}>📱</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: S.text }}>{connections} clientes</span>
+            <span style={{ fontSize: 14, fontWeight: 800, color: pgOk ? S.success : S.danger }}>{pgOk ? "Sistema Online" : "BD Offline"}</span>
+            <div style={{ width: 1, height: 16, background: S.border, margin: "0 4px" }} />
+            <span style={{ fontSize: 14, color: S.muted }}>🌐</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: S.text, fontFamily: "'JetBrains Mono', monospace" }}>{ip}</span>
+            <div style={{ width: 1, height: 16, background: S.border, margin: "0 4px" }} />
+            <span style={{ fontSize: 14, color: S.muted }}>⏱️</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: S.text }}>{uptime}</span>
+            <div style={{ width: 1, height: 16, background: S.border, margin: "0 4px" }} />
+            <span style={{ fontSize: 14, color: S.muted }}>📱</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: S.text }}>{connections} clientes</span>
             <div style={{ flex: 1 }} />
-            <button onClick={async () => { showMsg("🧹 Liberando RAM..."); await apiFetch('/system/clear-cache', { method: 'POST' }); showMsg("✅ RAM liberada"); }} style={{ padding: "5px 12px", borderRadius: 7, border: "none", background: S.info + "20", color: S.info, fontSize: 11, fontWeight: 800, cursor: "pointer" }}>
+            <button onClick={async () => { showMsg("🧹 Liberando RAM..."); await apiFetch('/system/clear-cache', { method: 'POST' }); showMsg("✅ RAM liberada"); }} style={{ padding: "6px 14px", borderRadius: 7, border: "none", background: S.info + "20", color: S.info, fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
               🧹 Liberar RAM
             </button>
           </div>
@@ -3104,8 +3336,8 @@ window.__App = function CantinaFull() {
           <div style={{ display: "flex", gap: 8, flex: "0 0 auto" }}>
             <div style={{ flex: 1, padding: "10px 14px", borderRadius: 10, background: S.surface, border: `1px solid ${S.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
-                <div style={{ fontSize: 11, fontWeight: 800, color: S.muted }}>💾 BACKUP</div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: S.text, marginTop: 2 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: S.muted }}>💾 BACKUP</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: S.text, marginTop: 2 }}>
                   {lastBackup ? `${new Date(lastBackup.date).toLocaleDateString("es-AR")} ${new Date(lastBackup.date).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })} (${lastBackup.size})` : "Sin backups"}
                 </div>
               </div>
@@ -3115,14 +3347,14 @@ window.__App = function CantinaFull() {
             </div>
             <div style={{ padding: "10px 14px", borderRadius: 10, background: S.surface, border: `1px solid ${S.border}`, display: "flex", alignItems: "center", gap: 10 }}>
               <div>
-                <div style={{ fontSize: 11, fontWeight: 800, color: S.muted }}>⏱️ UPTIME</div>
-                <div style={{ fontSize: 14, fontWeight: 900, color: S.info, marginTop: 2 }}>{uptime}</div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: S.muted }}>⏱️ UPTIME</div>
+                <div style={{ fontSize: 16, fontWeight: 900, color: S.info, marginTop: 2 }}>{uptime}</div>
               </div>
             </div>
             <div style={{ padding: "10px 14px", borderRadius: 10, background: S.surface, border: `1px solid ${S.border}`, display: "flex", alignItems: "center", gap: 10 }}>
               <div>
-                <div style={{ fontSize: 11, fontWeight: 800, color: S.muted }}>🌐 IP</div>
-                <div style={{ fontSize: 13, fontWeight: 900, color: S.text, marginTop: 2, fontFamily: "'JetBrains Mono', monospace" }}>{ip}</div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: S.muted }}>🌐 IP</div>
+                <div style={{ fontSize: 15, fontWeight: 900, color: S.text, marginTop: 2, fontFamily: "'JetBrains Mono', monospace" }}>{ip}</div>
               </div>
             </div>
             <button onClick={() => window.open('/promo.html', '_blank')} style={{
@@ -3132,7 +3364,7 @@ window.__App = function CantinaFull() {
               cursor: "pointer", flexShrink: 0,
             }}>
               <span style={{ fontSize: 22 }}>📺</span>
-              <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.04em" }}>VER TV</span>
+              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: "0.04em" }}>VER TV</span>
             </button>
           </div>
 
@@ -3154,12 +3386,12 @@ window.__App = function CantinaFull() {
             {/* Carousel images (in DB) */}
             <div style={{ flex: 1, display: "flex", flexDirection: "column", borderRadius: 10, background: S.surface, border: `1px solid ${S.border}`, overflow: "hidden" }}>
               <div style={{ padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `1px solid ${S.border}` }}>
-                <span style={{ fontSize: 11, fontWeight: 800, color: S.muted, letterSpacing: "0.06em" }}>📸 EN TV ({carouselImages.length})</span>
-                <a href="/promo.html" target="_blank" style={{ fontSize: 10, color: S.accent, textDecoration: "none", fontWeight: 700 }}>Ver TV →</a>
+                <span style={{ fontSize: 13, fontWeight: 800, color: S.muted, letterSpacing: "0.06em" }}>📸 EN TV ({carouselImages.length})</span>
+                <a href="/promo.html" target="_blank" style={{ fontSize: 12, color: S.accent, textDecoration: "none", fontWeight: 700 }}>Ver TV →</a>
               </div>
               <div style={{ flex: 1, overflow: "auto", padding: 8 }}>
                 {carouselImages.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "24px 0", fontSize: 11, color: S.muted }}>
+                  <div style={{ textAlign: "center", padding: "24px 0", fontSize: 13, color: S.muted }}>
                     <div style={{ fontSize: 32, marginBottom: 6, opacity: 0.3 }}>📺</div>
                     Sin imágenes — importá desde el pendrive
                   </div>
@@ -3168,14 +3400,14 @@ window.__App = function CantinaFull() {
                     <div key={img.id} style={{ display: "flex", alignItems: "center", padding: "6px 8px", borderRadius: 8, background: S.bg, marginBottom: 4, gap: 8 }}>
                       <img src={`/images/${img.filename}`} alt="" style={{ width: 42, height: 42, borderRadius: 6, objectFit: "cover", flexShrink: 0, background: S.border }} onError={e => { e.target.style.display='none'; }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: S.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{img.filename.replace(/^\d+_/, '')}</div>
-                        <div style={{ fontSize: 10, color: S.muted }}>#{img.id} · orden {img.orden}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: S.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{img.filename.replace(/^\d+_/, '')}</div>
+                        <div style={{ fontSize: 12, color: S.muted }}>#{img.id} · orden {img.orden}</div>
                       </div>
                       <button onClick={async () => {
                         const res = await fetch(`/api/carousel/${img.id}`, { method: 'DELETE' });
                         if (res.ok) { setCarouselImages(prev => prev.filter(i => i.id !== img.id)); showMsg("🗑 Imagen eliminada"); }
                         else showMsg("❌ Error al eliminar");
-                      }} style={{ padding: "4px 8px", borderRadius: 6, border: "none", background: S.danger + "18", color: S.danger, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>🗑</button>
+                      }} style={{ padding: "5px 10px", borderRadius: 6, border: "none", background: S.danger + "18", color: S.danger, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>🗑</button>
                     </div>
                   ))
                 )}
@@ -3185,30 +3417,30 @@ window.__App = function CantinaFull() {
             {/* Pendrive / Import */}
             <div style={{ width: 220, display: "flex", flexDirection: "column", borderRadius: 10, background: S.surface, border: `1px solid ${usbImages.length > 0 ? S.success + "60" : S.border}`, overflow: "hidden" }}>
               <div style={{ padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `1px solid ${S.border}` }}>
-                <span style={{ fontSize: 11, fontWeight: 800, color: S.muted, letterSpacing: "0.06em" }}>📂 SELECCIONAR</span>
+                <span style={{ fontSize: 13, fontWeight: 800, color: S.muted, letterSpacing: "0.06em" }}>📂 SELECCIONAR</span>
               </div>
               <div style={{ flex: 1, padding: 8, display: "flex", flexDirection: "column", gap: 8 }}>
                 {usbImages.length === 0 ? (
                   <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}>
                     <div style={{ fontSize: 28, opacity: 0.3 }}>💾</div>
-                    <div style={{ fontSize: 11, color: S.muted, textAlign: "center" }}>Seleccioná imágenes del pendrive</div>
-                    <button onClick={() => fileInputRef.current?.click()} style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${S.accent}50`, background: S.accent + "15", color: S.accent, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                    <div style={{ fontSize: 13, color: S.muted, textAlign: "center" }}>Seleccioná imágenes del pendrive</div>
+                    <button onClick={() => fileInputRef.current?.click()} style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${S.accent}50`, background: S.accent + "15", color: S.accent, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                       📁 Abrir archivos
                     </button>
                   </div>
                 ) : (
                   <>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: 10, color: S.success, fontWeight: 700 }}>{usbImages.length} lista{usbImages.length > 1 ? "s" : ""}</span>
-                      <button onClick={() => fileInputRef.current?.click()} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${S.border}`, background: "transparent", color: S.muted, fontSize: 10, cursor: "pointer" }}>+ Más</button>
+                      <span style={{ fontSize: 12, color: S.success, fontWeight: 700 }}>{usbImages.length} lista{usbImages.length > 1 ? "s" : ""}</span>
+                      <button onClick={() => fileInputRef.current?.click()} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${S.border}`, background: "transparent", color: S.muted, fontSize: 12, cursor: "pointer" }}>+ Más</button>
                     </div>
                     <div style={{ flex: 1, overflow: "auto" }}>
                       {usbImages.map(img => (
                         <div key={img.id} style={{ display: "flex", alignItems: "center", padding: "5px 6px", borderRadius: 6, background: S.bg, marginBottom: 3, gap: 6 }}>
-                          <span style={{ fontSize: 12 }}>🖼️</span>
+                          <span style={{ fontSize: 16 }}>🖼️</span>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 10, fontWeight: 700, color: S.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{img.name}</div>
-                            <div style={{ fontSize: 9, color: S.muted }}>{img.size}</div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: S.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{img.name}</div>
+                            <div style={{ fontSize: 11, color: S.muted }}>{img.size}</div>
                           </div>
                           <button disabled={carouselUploading} onClick={async () => {
                             setCarouselUploading(true);
@@ -3222,10 +3454,10 @@ window.__App = function CantinaFull() {
                               showMsg("✅ " + img.name + " importada");
                             } catch { showMsg("❌ Error al importar " + img.name); }
                             setCarouselUploading(false);
-                          }} style={{ padding: "3px 8px", borderRadius: 5, border: "none", background: S.success, color: "#000", fontSize: 8, fontWeight: 800, cursor: carouselUploading ? "not-allowed" : "pointer", opacity: carouselUploading ? 0.5 : 1 }}>
+                          }} style={{ padding: "4px 10px", borderRadius: 5, border: "none", background: S.success, color: "#000", fontSize: 12, fontWeight: 800, cursor: carouselUploading ? "not-allowed" : "pointer", opacity: carouselUploading ? 0.5 : 1 }}>
                             ↑
                           </button>
-                          <button onClick={() => setUsbImages(prev => prev.filter(i => i.id !== img.id))} style={{ padding: "3px 6px", borderRadius: 5, border: "none", background: S.danger + "20", color: S.danger, fontSize: 10, cursor: "pointer" }}>×</button>
+                          <button onClick={() => setUsbImages(prev => prev.filter(i => i.id !== img.id))} style={{ padding: "4px 8px", borderRadius: 5, border: "none", background: S.danger + "20", color: S.danger, fontSize: 12, cursor: "pointer" }}>×</button>
                         </div>
                       ))}
                     </div>
@@ -3246,7 +3478,7 @@ window.__App = function CantinaFull() {
                         }
                         setCarouselUploading(false);
                         showMsg("✅ " + ok + " imagen" + (ok !== 1 ? "es" : "") + " importada" + (ok !== 1 ? "s" : ""));
-                      }} style={{ flex: 1, padding: "6px 0", borderRadius: 6, border: "none", background: S.success, color: "#000", fontSize: 11, fontWeight: 800, cursor: carouselUploading ? "not-allowed" : "pointer", opacity: carouselUploading ? 0.6 : 1 }}>
+                      }} style={{ flex: 1, padding: "6px 0", borderRadius: 6, border: "none", background: S.success, color: "#000", fontSize: 13, fontWeight: 800, cursor: carouselUploading ? "not-allowed" : "pointer", opacity: carouselUploading ? 0.6 : 1 }}>
                         {carouselUploading ? "⏳ Subiendo..." : "📥 Importar todas"}
                       </button>
                       <button onClick={() => setUsbImages([])} style={{ padding: "6px 10px", borderRadius: 6, border: `1px solid ${S.border}`, background: "transparent", color: S.muted, fontSize: 11, cursor: "pointer" }}>✕</button>
@@ -3265,7 +3497,7 @@ window.__App = function CantinaFull() {
       {/* ========================================= */}
       {theme === 'modern' && (() => {
         const pedidosSinEntregar = pedidos.filter(p => p.estado === "listo" && !p.solo_despacho).length;
-        const pedidosSinCobrar = pedidos.filter(p => !p.cobrado && !p.solo_despacho).length;
+        const pedidosSinCobrar = pedidos.filter(p => !p.cobrado && !p.solo_despacho && p.estado !== 'cancelado').length;
         const pedidosCocina = pedidos.filter(p => ["pendiente", "en_preparacion"].includes(p.estado) && !p.solo_despacho).length;
         const mesasConPago = Array.from({ length: MESAS_TOTAL }, (_, i) => i + 1).some(n => pedidosMesa(n).some(p => !p.cobrado && p.estado === "entregado"));
         const bottomNavItems = [
@@ -3325,7 +3557,7 @@ window.__App = function CantinaFull() {
       {/* FLOATING: Autoservicio notifications */}
       {/* ========================================= */}
       {pedidosAutoservicio.length > 0 && (
-        <div style={{ position: "fixed", bottom: theme === 'modern' ? 76 : 60, left: 16, zIndex: 80, display: "flex", flexDirection: "column", gap: 6, maxWidth: 300 }}>
+        <div style={{ position: "fixed", bottom: theme === 'modern' ? 76 : 16, left: 16, zIndex: 80, display: "flex", flexDirection: "column", gap: 6, maxWidth: 300 }}>
           {pedidosAutoservicio.map((pa, idx) => (
             <div key={pa.id} style={{
               borderRadius: 14, overflow: "hidden",
@@ -3439,7 +3671,10 @@ window.__App = function CantinaFull() {
             else if (touchNum.field.startsWith("clienteForm_")) setClienteForm(prev => ({ ...prev, [touchNum.field.split("_")[1]]: v }));
             else if (touchNum.field.startsWith("stock_")) {
               const prodId = Number(touchNum.field.split("_")[1]);
-              setProductos(prev => prev.map(p => p.id === prodId ? { ...p, stock: Math.max(0, Number(v) || 0) } : p));
+              const newStock = Math.max(0, Number(v) || 0);
+              setProductos(prev => prev.map(p => p.id === prodId ? { ...p, stock: newStock } : p));
+              const prod = productos.find(p => p.id === prodId);
+              if (prod) apiFetch(`/productos/${prodId}`, { method: 'PUT', body: { nombre: prod.nombre, precio: prod.precio, stock: newStock, cat_id: prod.cat_id, cocina: prod.cocina } });
             }
             else if (touchNum.field.startsWith("productoForm_")) setProductoForm(prev => prev ? ({ ...prev, [touchNum.field.split("_")[1]]: v }) : null);
             setTouchNum(null);
@@ -3504,53 +3739,56 @@ function CobrarModal({ pedido, onCobrar, onClose, clientes, S }) {
     Math.ceil(totalFinal / 10000) * 10000,
   ].filter((v, i, a) => a.indexOf(v) === i && v >= totalFinal).slice(0, 4);
 
+  const destino = pedido.tipo === "mesa"
+    ? `Mesa ${pedido.mesa_numero}`
+    : pedido.nombre_cliente
+      ? `Barra · ${pedido.nombre_cliente}`
+      : "Barra";
+
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.75)" }}
       onClick={onClose}>
-      <div className="anim-in" style={{ width: "100%", maxWidth: 400, padding: 20, borderRadius: 18, background: S.surface, border: `2px solid ${S.border}`, maxHeight: "90vh", overflowY: "auto" }}
+      <div className="anim-in" style={{ width: "100%", maxWidth: 400, padding: 14, borderRadius: 18, background: S.surface, border: `2px solid ${S.border}`, maxHeight: "92vh", overflowY: "auto" }}
         onClick={e => e.stopPropagation()}>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 800, color: S.muted, letterSpacing: "0.06em" }}>COBRAR PEDIDO</div>
-            <div style={{ fontSize: 20, fontWeight: 900 }}>#{String(pedido.numero).padStart(3, "0")}</div>
-            {pedido.nombre_cliente && (
-              <div style={{ fontSize: 14, fontWeight: 700, color: S.info, marginTop: 2 }}>📢 {pedido.nombre_cliente}</div>
-            )}
+            <div style={{ fontSize: 10, fontWeight: 800, color: S.muted, letterSpacing: "0.06em" }}>COBRAR PEDIDO</div>
+            <div style={{ fontSize: 18, fontWeight: 900 }}>#{String(pedido.numero).padStart(3, "0")} <span style={{ color: S.info, fontWeight: 700 }}>· {destino}</span></div>
           </div>
-          <div>
-            <div style={{ fontSize: 26, fontWeight: 900, color: descMonto > 0 ? S.muted : S.accent, textDecoration: descMonto > 0 ? "line-through" : "none" }}>${pedido.total.toLocaleString()}</div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 24, fontWeight: 900, color: descMonto > 0 ? S.muted : S.accent, textDecoration: descMonto > 0 ? "line-through" : "none" }}>${pedido.total.toLocaleString()}</div>
             {descMonto > 0 && (
-              <div style={{ fontSize: 22, fontWeight: 900, color: S.success }}>${totalFinal.toLocaleString()}</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: S.success }}>${totalFinal.toLocaleString()}</div>
             )}
           </div>
         </div>
 
         {/* Items resumen */}
-        <div style={{ padding: "10px 12px", borderRadius: 10, background: S.bg, marginBottom: 12, fontSize: 12, color: S.muted, lineHeight: 1.6 }}>
+        <div style={{ padding: "7px 10px", borderRadius: 10, background: S.bg, marginBottom: 8, fontSize: 12, color: S.muted, lineHeight: 1.5 }}>
           {pedido.items.map((it, idx) => (
             <span key={idx}>{it.cantidad}x {itemNombre(it)}{idx < pedido.items.length - 1 ? " · " : ""}</span>
           ))}
         </div>
 
         {/* Discount */}
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>
-          <span style={{ fontSize: 11, fontWeight: 800, color: S.muted, whiteSpace: "nowrap" }}>🏷️ DESCUENTO</span>
+        <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 10 }}>
+          <span style={{ fontSize: 10, fontWeight: 800, color: S.muted, whiteSpace: "nowrap" }}>🏷️ DESC.</span>
           {[0, 5, 10, 15, 20].map(pct => (
             <button key={pct} onClick={() => setDescPct(pct === 0 ? "" : String(pct))} style={{
-              padding: "6px 12px", borderRadius: 8, border: `1px solid ${S.border}`,
+              padding: "4px 9px", borderRadius: 7, border: `1px solid ${S.border}`,
               background: (pct === 0 && !descPct) || descPct === String(pct) ? S.accent : S.bg,
               color: (pct === 0 && !descPct) || descPct === String(pct) ? "#fff" : S.text,
-              fontSize: 12, fontWeight: 700, cursor: "pointer",
+              fontSize: 11, fontWeight: 700, cursor: "pointer",
             }}>{pct === 0 ? "Sin" : `${pct}%`}</button>
           ))}
           {descMonto > 0 && (
-            <span style={{ fontSize: 12, fontWeight: 800, color: S.success, marginLeft: 4 }}>-${descMonto.toLocaleString()}</span>
+            <span style={{ fontSize: 11, fontWeight: 800, color: S.success, marginLeft: 2 }}>-${descMonto.toLocaleString()}</span>
           )}
         </div>
 
         {/* Client search */}
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 10 }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: S.muted, marginBottom: 6, letterSpacing: "0.04em" }}>
             CLIENTE {metodo === "cuenta_corriente" ? "(obligatorio)" : "(opcional)"}
           </div>
@@ -3608,20 +3846,20 @@ function CobrarModal({ pedido, onCobrar, onClose, clientes, S }) {
         </div>
 
         {/* Method */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
           {[["efectivo", "💵", "Efectivo"], ["transferencia", "📱", "Transfer."], ["cuenta_corriente", "📋", "Fiado"]].map(([v, icon, label]) => (
             <button key={v} onClick={() => setMetodo(v)} style={{
-              flex: 1, padding: "14px 0", borderRadius: 12, border: `2px solid ${metodo === v ? S.accent : S.border}`,
+              flex: 1, padding: "8px 0", borderRadius: 12, border: `2px solid ${metodo === v ? S.accent : S.border}`,
               background: metodo === v ? S.accent : S.bg, color: metodo === v ? "#fff" : S.text,
-              fontSize: 12, fontWeight: 800, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+              fontSize: 12, fontWeight: 800, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
             }}>
-              <span style={{ fontSize: 22 }}>{icon}</span>{label}
+              <span style={{ fontSize: 18 }}>{icon}</span>{label}
             </button>
           ))}
         </div>
 
         {metodo === "efectivo" && (
-          <div style={{ marginBottom: 12 }}>
+          <div style={{ marginBottom: 8 }}>
             <div style={{ display: "flex", gap: 8, marginBottom: 6, alignItems: "flex-end" }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 10, fontWeight: 800, color: S.muted, marginBottom: 4 }}>RECIBIDO</div>
@@ -3660,8 +3898,8 @@ function CobrarModal({ pedido, onCobrar, onClose, clientes, S }) {
         )}
 
         {metodo === "transferencia" && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ padding: 16, borderRadius: 12, background: S.bg, border: `1px solid ${S.border}`, textAlign: "center", marginBottom: 10 }}>
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ padding: 10, borderRadius: 12, background: S.bg, border: `1px solid ${S.border}`, textAlign: "center", marginBottom: 8 }}>
               <div style={{ fontSize: 10, fontWeight: 800, color: S.muted }}>ALIAS PARA TRANSFERENCIA</div>
               <div style={{ fontSize: 22, fontWeight: 900, color: S.info, marginTop: 6, fontFamily: "'JetBrains Mono', monospace" }}>cantina.alias</div>
               <div style={{ fontSize: 11, color: S.muted, marginTop: 4 }}>Indicale este alias al cliente</div>
@@ -3682,7 +3920,7 @@ function CobrarModal({ pedido, onCobrar, onClose, clientes, S }) {
         )}
 
         {metodo === "cuenta_corriente" && (
-          <div style={{ marginBottom: 16, padding: 16, borderRadius: 12, background: S.bg, border: `1px solid ${clienteSelec ? S.warning : S.danger}40`, textAlign: "center" }}>
+          <div style={{ marginBottom: 10, padding: 10, borderRadius: 12, background: S.bg, border: `1px solid ${clienteSelec ? S.warning : S.danger}40`, textAlign: "center" }}>
             {clienteSelec ? (
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: S.warning }}>
@@ -3715,5 +3953,8 @@ function CobrarModal({ pedido, onCobrar, onClose, clientes, S }) {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(window.__App));
 </script>
+<style>#fs-btn{position:fixed;bottom:18px;right:18px;z-index:9999;padding:9px 15px;background:rgba(20,24,36,0.9);color:#fff;border:1px solid rgba(255,255,255,0.18);border-radius:8px;font-size:10px;font-weight:800;letter-spacing:.04em;cursor:pointer;touch-action:manipulation;backdrop-filter:blur(8px);box-shadow:0 4px 20px rgba(0,0,0,.5)}#fs-btn.fs-hidden{display:none}</style>
+<button id="fs-btn">⛶ PANTALLA COMPLETA</button>
+<script>(function(){var b=document.getElementById('fs-btn');b.onclick=function(){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();};document.addEventListener('fullscreenchange',function(){b.classList.toggle('fs-hidden',!!document.fullscreenElement);});})();</script>
 </body>
 </html>
