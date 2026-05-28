@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Cantina — Promociones</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -12,6 +12,7 @@
       width: 100vw;
       height: 100vh;
       overflow: hidden;
+      overscroll-behavior-y: contain;
       font-family: system-ui, sans-serif;
       cursor: none;
     }
@@ -175,5 +176,8 @@
   fetchImages();
   setInterval(fetchImages, POLL_INTERVAL);
 </script>
+<style>#fs-btn{position:fixed;bottom:18px;right:18px;z-index:9999;padding:14px 22px;background:rgba(20,24,36,0.9);color:#fff;border:1px solid rgba(255,255,255,0.18);border-radius:12px;font-size:15px;font-weight:800;letter-spacing:.04em;cursor:pointer;touch-action:manipulation;backdrop-filter:blur(8px);box-shadow:0 4px 20px rgba(0,0,0,.5)}#fs-btn.fs-hidden{display:none}</style>
+<button id="fs-btn">⛶ PANTALLA COMPLETA</button>
+<script>(function(){var b=document.getElementById('fs-btn');b.onclick=function(){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();};document.addEventListener('fullscreenchange',function(){b.classList.toggle('fs-hidden',!!document.fullscreenElement);});})();</script>
 </body>
 </html>

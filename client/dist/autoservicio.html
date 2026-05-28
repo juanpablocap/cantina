@@ -4,14 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Cantina POS — Autoservicio</title>
-<style>*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}body{margin:0;background:#FAFAF7;color:#1A1A1A;overflow:hidden;height:100vh}#root{height:100vh;color:#1A1A1A}input:focus,select:focus{outline:none}::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#D0D5DB;border-radius:4px}button{transition:transform 0.1s ease,box-shadow 0.1s ease}button:active{transform:scale(0.97)!important}</style>
+<style>*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}body{margin:0;background:#FAFAF7;color:#1A1A1A;overflow:hidden;height:100vh;overscroll-behavior-y:contain}#root{height:100vh;color:#1A1A1A}input:focus,select:focus{outline:none}::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#D0D5DB;border-radius:4px}button{transition:transform 0.1s ease,box-shadow 0.1s ease}button:active{transform:scale(0.97)!important}</style>
 </head>
 <body>
 <div id="root"></div>
 <script src="/vendor/react.production.min.js"></script>
 <script src="/vendor/react-dom.production.min.js"></script>
-<script src="/vendor/babel.min.js"></script>
-<script type="text/babel" data-presets="react">
+<script>
 const {useState, useEffect, useRef} = React;
 
 const API = window.location.origin + '/api';
@@ -23,7 +22,6 @@ const apiFetch = async (path, opts = {}) => {
   } catch (e) { console.error('API:', e); return null; }
 };
 
-// Color/icon mapping for categories
 const CAT_STYLES = {
   "Platos": { emoji: "🍽️", color: "#E07A5F", bg: "linear-gradient(135deg, #E07A5F, #c94b4b)", desc: "Milanesas, hamburguesas, lomos y más" },
   "Bebidas": { emoji: "🍺", color: "#6C9BCF", bg: "linear-gradient(135deg, #6C9BCF, #2F80ED)", desc: "Gaseosas, cervezas, agua y tragos" },
@@ -32,7 +30,6 @@ const CAT_STYLES = {
 };
 const DEFAULT_STYLE = { emoji: "📦", color: "#6B7080", bg: "linear-gradient(135deg, #6B7080, #444)", desc: "Otros productos" };
 
-// Product icon mapping
 const PROD_ICONS = {
   "milanesa": { icon: "🥩", bg: "linear-gradient(135deg, #f5af19, #f12711)" },
   "hamburguesa": { icon: "🍔", bg: "linear-gradient(135deg, #F09819, #EDDE5D)" },
@@ -82,7 +79,6 @@ window.__App = function TabletAutoservicio() {
   const [errorEnvio, setErrorEnvio] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
 
-  // Load data from API
   useEffect(() => {
     setLoading(true);
     setErrorCarga(false);
@@ -195,285 +191,419 @@ window.__App = function TabletAutoservicio() {
   const currentItems = selectedCat ? (productosByCat[selectedCat] || []) : [];
 
   if (loading) {
-    return (
-      <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Nunito', sans-serif" }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 60, marginBottom: 16 }}>🍽️</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: C.muted }}>Cargando menú...</div>
-        </div>
-      </div>
+    return React.createElement("div", {
+      style: { minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Nunito', sans-serif" }
+    },
+      React.createElement("div", { style: { textAlign: "center" } },
+        React.createElement("div", { style: { fontSize: 60, marginBottom: 16 } }, "🍽️"),
+        React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: C.muted } }, "Cargando menú...")
+      )
     );
   }
 
   if (errorCarga) {
-    return (
-      <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Nunito', sans-serif" }}>
-        <div style={{ textAlign: "center", padding: 40 }}>
-          <div style={{ fontSize: 60, marginBottom: 16 }}>⚠️</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: C.accent, marginBottom: 8 }}>Sistema no disponible</div>
-          <div style={{ fontSize: 15, color: C.muted, marginBottom: 28 }}>Pedí en el mostrador o intentá en un momento</div>
-          <button onClick={() => setRetryKey(k => k + 1)} className="tap"
-            style={{ padding: "14px 32px", borderRadius: 14, border: "none", background: C.accent, color: "#fff", fontSize: 16, fontWeight: 800, cursor: "pointer" }}>
-            Reintentar
-          </button>
-        </div>
-      </div>
+    return React.createElement("div", {
+      style: { minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Nunito', sans-serif" }
+    },
+      React.createElement("div", { style: { textAlign: "center", padding: 40 } },
+        React.createElement("div", { style: { fontSize: 60, marginBottom: 16 } }, "⚠️"),
+        React.createElement("div", { style: { fontSize: 22, fontWeight: 800, color: C.accent, marginBottom: 8 } }, "Sistema no disponible"),
+        React.createElement("div", { style: { fontSize: 15, color: C.muted, marginBottom: 28 } }, "Pedí en el mostrador o intentá en un momento"),
+        React.createElement("button", {
+          onClick: () => setRetryKey(k => k + 1),
+          className: "tap",
+          style: { padding: "14px 32px", borderRadius: 14, border: "none", background: C.accent, color: "#fff", fontSize: 16, fontWeight: 800, cursor: "pointer" }
+        }, "Reintentar")
+      )
     );
   }
 
-  return (
-    <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'Nunito', 'DM Sans', -apple-system, sans-serif", color: C.text, display: "flex", flexDirection: "column", userSelect: "none", WebkitUserSelect: "none" }}>
-      <style>{`
-        @import url('/fonts/nunito-pf.css');
-        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-        body { margin: 0; overflow-x: hidden; }
-        ::-webkit-scrollbar { width: 14px; }
-        ::-webkit-scrollbar-track { background: #E8E5DF40; border-radius: 7px; margin: 4px; }
-        ::-webkit-scrollbar-thumb { background: #C4B8A8; border-radius: 7px; border: 3px solid transparent; background-clip: padding-box; }
-        @keyframes popIn { 0% { transform: scale(0.85); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-        @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        @keyframes bounceIn { 0% { transform: scale(0); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
-        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-        @keyframes fadeSlide { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-        .pop-in { animation: popIn 0.35s ease-out; }
-        .slide-up { animation: slideUp 0.4s ease-out; }
-        .bounce-in { animation: bounceIn 0.4s ease-out; }
-        .float-anim { animation: float 3s ease-in-out infinite; }
-        .fade-slide { animation: fadeSlide 0.3s ease-out both; }
-        .tap:active { transform: scale(0.96) !important; }
-      `}</style>
+  return React.createElement("div", {
+    style: { minHeight: "100vh", background: C.bg, fontFamily: "'Nunito', 'DM Sans', -apple-system, sans-serif", color: C.text, display: "flex", flexDirection: "column", userSelect: "none", WebkitUserSelect: "none" }
+  },
+    React.createElement("style", null, `
+      @import url('/fonts/nunito-pf.css');
+      * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+      body { margin: 0; overflow-x: hidden; }
+      ::-webkit-scrollbar { width: 14px; }
+      ::-webkit-scrollbar-track { background: #E8E5DF40; border-radius: 7px; margin: 4px; }
+      ::-webkit-scrollbar-thumb { background: #C4B8A8; border-radius: 7px; border: 3px solid transparent; background-clip: padding-box; }
+      @keyframes popIn { 0% { transform: scale(0.85); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+      @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+      @keyframes bounceIn { 0% { transform: scale(0); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
+      @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+      @keyframes fadeSlide { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+      .pop-in { animation: popIn 0.35s ease-out; }
+      .slide-up { animation: slideUp 0.4s ease-out; }
+      .bounce-in { animation: bounceIn 0.4s ease-out; }
+      .float-anim { animation: float 3s ease-in-out infinite; }
+      .fade-slide { animation: fadeSlide 0.3s ease-out both; }
+      .tap:active { transform: scale(0.96) !important; }
+    `),
 
-      {/* WELCOME */}
-      {screen === SC.WELCOME && (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: `linear-gradient(150deg, ${C.warm} 0%, ${C.bg} 50%, #FEF0EC 100%)`, padding: 40, textAlign: "center" }}>
-          <div className="float-anim" style={{ fontSize: 80, marginBottom: 24 }}>🍽️</div>
-          <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 48, fontWeight: 900, color: C.warmDark, lineHeight: 1.1, marginBottom: 12 }}>¡Bienvenido!</h1>
-          <p style={{ fontSize: 20, color: C.muted, fontWeight: 600, marginBottom: 40, maxWidth: 400 }}>Hacé tu pedido desde acá y te avisamos cuando esté listo</p>
-          <button onClick={() => setScreen(SC.CATEGORIES)} className="tap" style={{ padding: "22px 60px", borderRadius: 20, border: "none", background: C.accent, color: "#fff", fontSize: 22, fontWeight: 800, cursor: "pointer", boxShadow: `0 8px 30px ${C.accent}40` }}>EMPEZAR →</button>
-        </div>
-      )}
+    // WELCOME
+    screen === SC.WELCOME && React.createElement("div", {
+      style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: `linear-gradient(150deg, ${C.warm} 0%, ${C.bg} 50%, #FEF0EC 100%)`, padding: 40, textAlign: "center" }
+    },
+      React.createElement("div", { className: "float-anim", style: { fontSize: 80, marginBottom: 24 } }, "🍽️"),
+      React.createElement("h1", { style: { fontFamily: "'Playfair Display', serif", fontSize: 48, fontWeight: 900, color: C.warmDark, lineHeight: 1.1, marginBottom: 12 } }, "¡Bienvenido!"),
+      React.createElement("p", { style: { fontSize: 20, color: C.muted, fontWeight: 600, marginBottom: 40, maxWidth: 400 } }, "Hacé tu pedido desde acá y te avisamos cuando esté listo"),
+      React.createElement("button", {
+        onClick: () => setScreen(SC.CATEGORIES),
+        className: "tap",
+        style: { padding: "22px 60px", borderRadius: 20, border: "none", background: C.accent, color: "#fff", fontSize: 22, fontWeight: 800, cursor: "pointer", boxShadow: `0 8px 30px ${C.accent}40` }
+      }, "EMPEZAR →")
+    ),
 
-      {/* CATEGORIES */}
-      {screen === SC.CATEGORIES && (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", background: C.bg }}>
-          <div style={{ padding: "20px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-            <div><div style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 800, color: C.warmDark }}>¿Qué querés pedir?</div></div>
-            <button onClick={resetear} className="tap" style={{ padding: "8px 16px", borderRadius: 10, border: `2px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>✕ Cancelar</button>
-          </div>
-          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 28px 28px" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 20, width: "100%", maxWidth: 600 }}>
-              {categorias.map((cat, idx) => {
-                const itemsInCart = carrito.filter(i => (productosByCat[cat.id] || []).find(x => x.id === i.id));
-                const catTotal = itemsInCart.reduce((s, i) => s + i.precio * i.cantidad, 0);
-                return (
-                  <div key={cat.id} className="fade-slide tap" style={{ animationDelay: `${idx * 0.08}s` }} onClick={() => selectCategory(cat.id)}>
-                    <div style={{ borderRadius: 24, overflow: "hidden", cursor: "pointer", background: cat.bg, position: "relative", boxShadow: `0 8px 30px ${cat.color}30`, minHeight: 180, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center" }}>
-                      <div style={{ fontSize: 56, marginBottom: 10 }}>{cat.emoji}</div>
-                      <div style={{ fontSize: 24, fontWeight: 900, color: "#fff", textShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>{cat.nombre}</div>
-                      <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", fontWeight: 600, marginTop: 4 }}>{cat.desc}</div>
-                      {itemsInCart.length > 0 && <div style={{ position: "absolute", top: 12, right: 12, padding: "4px 12px", borderRadius: 20, background: "rgba(255,255,255,0.95)", color: cat.color, fontSize: 12, fontWeight: 900 }}>{itemsInCart.reduce((s, i) => s + i.cantidad, 0)} · ${catTotal.toLocaleString()}</div>}
-                      {visitedCats.includes(cat.id) && <div style={{ position: "absolute", top: 12, left: 12, width: 28, height: 28, borderRadius: "50%", background: "rgba(255,255,255,0.9)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>✓</div>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          {carrito.length > 0 && (
-            <div className="slide-up" style={{ padding: "12px 28px", background: C.card, borderTop: `2px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-              <div><span style={{ fontSize: 13, fontWeight: 700, color: C.muted }}>{cantItems} items</span><span style={{ fontSize: 20, fontWeight: 900, color: C.warmDark, marginLeft: 12 }}>${total.toLocaleString()}</span></div>
-              <button onClick={() => setScreen(SC.NAME)} className="tap" style={{ padding: "14px 32px", borderRadius: 14, border: "none", background: C.accent, color: "#fff", fontSize: 16, fontWeight: 800, cursor: "pointer" }}>FINALIZAR →</button>
-            </div>
-          )}
-        </div>
-      )}
+    // CATEGORIES
+    screen === SC.CATEGORIES && React.createElement("div", {
+      style: { flex: 1, display: "flex", flexDirection: "column", background: C.bg }
+    },
+      React.createElement("div", { style: { padding: "20px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 } },
+        React.createElement("div", null,
+          React.createElement("div", { style: { fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 800, color: C.warmDark } }, "¿Qué querés pedir?")
+        ),
+        React.createElement("button", {
+          onClick: resetear,
+          className: "tap",
+          style: { padding: "8px 16px", borderRadius: 10, border: `2px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: 12, fontWeight: 700, cursor: "pointer" }
+        }, "✕ Cancelar")
+      ),
+      React.createElement("div", { style: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 28px 28px" } },
+        React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 20, width: "100%", maxWidth: 600 } },
+          categorias.map((cat, idx) => {
+            const itemsInCart = carrito.filter(i => (productosByCat[cat.id] || []).find(x => x.id === i.id));
+            const catTotal = itemsInCart.reduce((s, i) => s + i.precio * i.cantidad, 0);
+            return React.createElement("div", {
+              key: cat.id,
+              className: "fade-slide tap",
+              style: { animationDelay: `${idx * 0.08}s` },
+              onClick: () => selectCategory(cat.id)
+            },
+              React.createElement("div", {
+                style: { borderRadius: 24, overflow: "hidden", cursor: "pointer", background: cat.bg, position: "relative", boxShadow: `0 8px 30px ${cat.color}30`, minHeight: 180, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center" }
+              },
+                React.createElement("div", { style: { fontSize: 56, marginBottom: 10 } }, cat.emoji),
+                React.createElement("div", { style: { fontSize: 24, fontWeight: 900, color: "#fff", textShadow: "0 2px 8px rgba(0,0,0,0.2)" } }, cat.nombre),
+                React.createElement("div", { style: { fontSize: 13, color: "rgba(255,255,255,0.8)", fontWeight: 600, marginTop: 4 } }, cat.desc),
+                itemsInCart.length > 0 && React.createElement("div", {
+                  style: { position: "absolute", top: 12, right: 12, padding: "4px 12px", borderRadius: 20, background: "rgba(255,255,255,0.95)", color: cat.color, fontSize: 12, fontWeight: 900 }
+                }, `${itemsInCart.reduce((s, i) => s + i.cantidad, 0)} · $${catTotal.toLocaleString()}`),
+                visitedCats.includes(cat.id) && React.createElement("div", {
+                  style: { position: "absolute", top: 12, left: 12, width: 28, height: 28, borderRadius: "50%", background: "rgba(255,255,255,0.9)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }
+                }, "✓")
+              )
+            );
+          })
+        )
+      ),
+      carrito.length > 0 && React.createElement("div", {
+        className: "slide-up",
+        style: { padding: "12px 28px", background: C.card, borderTop: `2px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }
+      },
+        React.createElement("div", null,
+          React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: C.muted } }, `${cantItems} items`),
+          React.createElement("span", { style: { fontSize: 20, fontWeight: 900, color: C.warmDark, marginLeft: 12 } }, "$" + total.toLocaleString())
+        ),
+        React.createElement("button", {
+          onClick: () => setScreen(SC.NAME),
+          className: "tap",
+          style: { padding: "14px 32px", borderRadius: 14, border: "none", background: C.accent, color: "#fff", fontSize: 16, fontWeight: 800, cursor: "pointer" }
+        }, "FINALIZAR →")
+      )
+    ),
 
-      {/* ITEMS */}
-      {screen === SC.ITEMS && currentCat && (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", background: C.bg }}>
-          <div style={{ padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", background: C.card, borderBottom: `2px solid ${C.border}`, flexShrink: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <button onClick={() => setScreen(SC.CATEGORIES)} className="tap" style={{ padding: "8px 14px", borderRadius: 10, border: `2px solid ${C.border}`, background: "transparent", color: C.text, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>← Volver</button>
-              <span style={{ fontSize: 24 }}>{currentCat.emoji}</span>
-              <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 800, color: currentCat.color }}>{currentCat.nombre}</span>
-            </div>
-            {carrito.length > 0 && <span style={{ fontSize: 18, fontWeight: 900, color: C.warmDark }}>${total.toLocaleString()}</span>}
-          </div>
-          <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14 }}>
-              {currentItems.map(item => {
-                const enCarrito = carrito.find(i => i.id === item.id);
-                return (
-                  <div key={item.id} className={`tap ${addedId === item.id ? "bounce-in" : "fade-slide"}`} onClick={() => agregarItem(item)}
-                    style={{ borderRadius: 16, overflow: "hidden", background: C.card, border: `2px solid ${enCarrito ? currentCat.color : C.border}`, cursor: "pointer", position: "relative" }}>
-                    <div style={{ position: "relative", height: 130, overflow: "hidden" }}>
-                      <div style={{ width: "100%", height: "100%", background: item.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 52 }}>{item.icon}</div>
-                      {enCarrito && <div style={{ position: "absolute", top: 8, right: 8, width: 30, height: 30, borderRadius: "50%", background: currentCat.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 14, fontWeight: 900 }}>{enCarrito.cantidad}</div>}
-                    </div>
-                    <div style={{ padding: "10px 12px 12px" }}>
-                      <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 8 }}>{item.nombre}</div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontSize: 19, fontWeight: 900, color: currentCat.color }}>${item.precio.toLocaleString()}</span>
-                        <div style={{ width: 32, height: 32, borderRadius: 10, background: currentCat.color + "15", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, color: currentCat.color }}>+</div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <div style={{ padding: "12px 24px", background: C.card, borderTop: `2px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-            <div style={{ display: "flex", gap: 6, overflowX: "auto", flex: 1, marginRight: 12 }}>
-              {carrito.map(item => (
-                <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 8px 4px 4px", borderRadius: 8, background: C.warm, flexShrink: 0 }}>
-                  <div style={{ width: 26, height: 26, borderRadius: 5, background: item.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>{item.icon}</div>
-                  <span style={{ fontSize: 10, fontWeight: 700 }}>{item.nombre}</span>
-                  <span style={{ fontSize: 9, color: C.muted }}>x{item.cantidad}</span>
-                  <button onClick={e => { e.stopPropagation(); quitarItem(item.id); }} style={{ width: 18, height: 18, borderRadius: 4, border: "none", background: C.accent + "20", color: C.accent, fontSize: 10, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
-                </div>
-              ))}
-            </div>
-            <button onClick={doneWithCategory} className="tap" style={{ padding: "14px 28px", borderRadius: 14, border: "none", background: carrito.length > 0 ? C.accent : C.border, color: carrito.length > 0 ? "#fff" : C.muted, fontSize: 15, fontWeight: 800, cursor: "pointer", flexShrink: 0 }}>
-              {carrito.length > 0 ? "LISTO →" : "VOLVER"}
-            </button>
-          </div>
-        </div>
-      )}
+    // ITEMS
+    screen === SC.ITEMS && currentCat && React.createElement("div", {
+      style: { flex: 1, display: "flex", flexDirection: "column", background: C.bg }
+    },
+      React.createElement("div", {
+        style: { padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", background: C.card, borderBottom: `2px solid ${C.border}`, flexShrink: 0 }
+      },
+        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } },
+          React.createElement("button", {
+            onClick: () => setScreen(SC.CATEGORIES),
+            className: "tap",
+            style: { padding: "8px 14px", borderRadius: 10, border: `2px solid ${C.border}`, background: "transparent", color: C.text, fontSize: 13, fontWeight: 700, cursor: "pointer" }
+          }, "← Volver"),
+          React.createElement("span", { style: { fontSize: 24 } }, currentCat.emoji),
+          React.createElement("span", { style: { fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 800, color: currentCat.color } }, currentCat.nombre)
+        ),
+        carrito.length > 0 && React.createElement("span", {
+          style: { fontSize: 18, fontWeight: 900, color: C.warmDark }
+        }, "$" + total.toLocaleString())
+      ),
+      React.createElement("div", { style: { flex: 1, overflow: "auto", padding: 16 } },
+        React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14 } },
+          currentItems.map(item => {
+            const enCarrito = carrito.find(i => i.id === item.id);
+            return React.createElement("div", {
+              key: item.id,
+              className: "tap " + (addedId === item.id ? "bounce-in" : "fade-slide"),
+              onClick: () => agregarItem(item),
+              style: { borderRadius: 16, overflow: "hidden", background: C.card, border: `2px solid ${enCarrito ? currentCat.color : C.border}`, cursor: "pointer", position: "relative" }
+            },
+              React.createElement("div", { style: { position: "relative", height: 130, overflow: "hidden" } },
+                React.createElement("div", {
+                  style: { width: "100%", height: "100%", background: item.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 52 }
+                }, item.icon),
+                enCarrito && React.createElement("div", {
+                  style: { position: "absolute", top: 8, right: 8, width: 30, height: 30, borderRadius: "50%", background: currentCat.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 14, fontWeight: 900 }
+                }, enCarrito.cantidad)
+              ),
+              React.createElement("div", { style: { padding: "10px 12px 12px" } },
+                React.createElement("div", { style: { fontWeight: 800, fontSize: 15, marginBottom: 8 } }, item.nombre),
+                React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
+                  React.createElement("span", { style: { fontSize: 19, fontWeight: 900, color: currentCat.color } }, "$" + item.precio.toLocaleString()),
+                  React.createElement("div", {
+                    style: { width: 32, height: 32, borderRadius: 10, background: currentCat.color + "15", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, color: currentCat.color }
+                  }, "+")
+                )
+              )
+            );
+          })
+        )
+      ),
+      React.createElement("div", {
+        style: { padding: "12px 24px", background: C.card, borderTop: `2px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }
+      },
+        React.createElement("div", { style: { display: "flex", gap: 6, overflowX: "auto", flex: 1, marginRight: 12 } },
+          carrito.map(item =>
+            React.createElement("div", {
+              key: item.id,
+              style: { display: "flex", alignItems: "center", gap: 5, padding: "4px 8px 4px 4px", borderRadius: 8, background: C.warm, flexShrink: 0 }
+            },
+              React.createElement("div", {
+                style: { width: 26, height: 26, borderRadius: 5, background: item.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }
+              }, item.icon),
+              React.createElement("span", { style: { fontSize: 10, fontWeight: 700 } }, item.nombre),
+              React.createElement("span", { style: { fontSize: 9, color: C.muted } }, "x" + item.cantidad),
+              React.createElement("button", {
+                onClick: e => { e.stopPropagation(); quitarItem(item.id); },
+                style: { width: 18, height: 18, borderRadius: 4, border: "none", background: C.accent + "20", color: C.accent, fontSize: 10, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }
+              }, "−")
+            )
+          )
+        ),
+        React.createElement("button", {
+          onClick: doneWithCategory,
+          className: "tap",
+          style: { padding: "14px 28px", borderRadius: 14, border: "none", background: carrito.length > 0 ? C.accent : C.border, color: carrito.length > 0 ? "#fff" : C.muted, fontSize: 15, fontWeight: 800, cursor: "pointer", flexShrink: 0 }
+        }, carrito.length > 0 ? "LISTO →" : "VOLVER")
+      )
+    ),
 
-      {/* SUGGEST */}
-      {screen === SC.SUGGEST && currentCat && (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: C.warm, padding: 28 }}>
-          <div className="pop-in" style={{ width: "100%", maxWidth: 500, textAlign: "center" }}>
-            <div style={{ fontSize: 56, marginBottom: 12 }}>{currentCat.emoji}</div>
-            <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 30, fontWeight: 800, color: C.warmDark, marginBottom: 6 }}>
-              {currentCat.nombre === "Bebidas" ? "¿Algo para tomar?" : currentCat.nombre === "Postres" ? "¿Un postre para cerrar?" : currentCat.nombre === "Cafetería" ? "¿Un cafecito?" : "¿Algo más?"}
-            </h2>
-            <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min((productosByCat[currentCat.id] || []).length, 3)}, 1fr)`, gap: 12, marginBottom: 28, marginTop: 20 }}>
-              {(productosByCat[currentCat.id] || []).slice(0, 3).map(item => {
-                const enCarrito = carrito.find(i => i.id === item.id);
-                return (
-                  <div key={item.id} className="fade-slide tap" onClick={() => agregarItem(item)}
-                    style={{ borderRadius: 16, overflow: "hidden", background: C.card, border: `2px solid ${enCarrito ? currentCat.color : C.border}`, cursor: "pointer", position: "relative" }}>
-                    {enCarrito && <div style={{ position: "absolute", top: 8, right: 8, width: 30, height: 30, borderRadius: "50%", background: currentCat.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 14, fontWeight: 900, zIndex: 2 }}>{enCarrito.cantidad}</div>}
-                    <div style={{ width: "100%", height: 100, background: item.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 40 }}>{item.icon}</div>
-                    <div style={{ padding: "8px 10px" }}>
-                      <div style={{ fontWeight: 800, fontSize: 13 }}>{item.nombre}</div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
-                        <span style={{ fontSize: 16, fontWeight: 900, color: currentCat.color }}>${item.precio.toLocaleString()}</span>
-                        <div style={{ padding: "4px 12px", borderRadius: 8, background: enCarrito ? C.success : currentCat.color, color: "#fff", fontSize: 11, fontWeight: 800 }}>{enCarrito ? "✓ x" + enCarrito.cantidad : "+ Agregar"}</div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-              <button onClick={() => setScreen(SC.NAME)} className="tap" style={{ padding: "16px 36px", borderRadius: 16, border: `2px solid ${C.border}`, background: C.card, color: C.text, fontSize: 16, fontWeight: 800, cursor: "pointer" }}>No, gracias</button>
-              <button onClick={acceptSuggestion} className="tap" style={{ padding: "16px 36px", borderRadius: 16, border: "none", background: currentCat.color, color: "#fff", fontSize: 16, fontWeight: 800, cursor: "pointer" }}>¡Sí, ver {currentCat.nombre.toLowerCase()}!</button>
-            </div>
-            <div style={{ marginTop: 16, fontSize: 13, color: C.muted }}>Tu pedido: {cantItems} items · <span style={{ fontWeight: 900, color: C.warmDark }}>${total.toLocaleString()}</span></div>
-          </div>
-        </div>
-      )}
+    // SUGGEST
+    screen === SC.SUGGEST && currentCat && React.createElement("div", {
+      style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: C.warm, padding: 28 }
+    },
+      React.createElement("div", { className: "pop-in", style: { width: "100%", maxWidth: 500, textAlign: "center" } },
+        React.createElement("div", { style: { fontSize: 56, marginBottom: 12 } }, currentCat.emoji),
+        React.createElement("h2", {
+          style: { fontFamily: "'Playfair Display', serif", fontSize: 30, fontWeight: 800, color: C.warmDark, marginBottom: 6 }
+        }, currentCat.nombre === "Bebidas" ? "¿Algo para tomar?" : currentCat.nombre === "Postres" ? "¿Un postre para cerrar?" : currentCat.nombre === "Cafetería" ? "¿Un cafecito?" : "¿Algo más?"),
+        React.createElement("div", {
+          style: { display: "grid", gridTemplateColumns: `repeat(${Math.min((productosByCat[currentCat.id] || []).length, 3)}, 1fr)`, gap: 12, marginBottom: 28, marginTop: 20 }
+        },
+          (productosByCat[currentCat.id] || []).slice(0, 3).map(item => {
+            const enCarrito = carrito.find(i => i.id === item.id);
+            return React.createElement("div", {
+              key: item.id,
+              className: "fade-slide tap",
+              onClick: () => agregarItem(item),
+              style: { borderRadius: 16, overflow: "hidden", background: C.card, border: `2px solid ${enCarrito ? currentCat.color : C.border}`, cursor: "pointer", position: "relative" }
+            },
+              enCarrito && React.createElement("div", {
+                style: { position: "absolute", top: 8, right: 8, width: 30, height: 30, borderRadius: "50%", background: currentCat.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 14, fontWeight: 900, zIndex: 2 }
+              }, enCarrito.cantidad),
+              React.createElement("div", {
+                style: { width: "100%", height: 100, background: item.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 40 }
+              }, item.icon),
+              React.createElement("div", { style: { padding: "8px 10px" } },
+                React.createElement("div", { style: { fontWeight: 800, fontSize: 13 } }, item.nombre),
+                React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 } },
+                  React.createElement("span", { style: { fontSize: 16, fontWeight: 900, color: currentCat.color } }, "$" + item.precio.toLocaleString()),
+                  React.createElement("div", {
+                    style: { padding: "4px 12px", borderRadius: 8, background: enCarrito ? C.success : currentCat.color, color: "#fff", fontSize: 11, fontWeight: 800 }
+                  }, enCarrito ? "✓ x" + enCarrito.cantidad : "+ Agregar")
+                )
+              )
+            );
+          })
+        ),
+        React.createElement("div", { style: { display: "flex", gap: 12, justifyContent: "center" } },
+          React.createElement("button", {
+            onClick: () => setScreen(SC.NAME),
+            className: "tap",
+            style: { padding: "16px 36px", borderRadius: 16, border: `2px solid ${C.border}`, background: C.card, color: C.text, fontSize: 16, fontWeight: 800, cursor: "pointer" }
+          }, "No, gracias"),
+          React.createElement("button", {
+            onClick: acceptSuggestion,
+            className: "tap",
+            style: { padding: "16px 36px", borderRadius: 16, border: "none", background: currentCat.color, color: "#fff", fontSize: 16, fontWeight: 800, cursor: "pointer" }
+          }, "¡Sí, ver " + currentCat.nombre.toLowerCase() + "!")
+        ),
+        React.createElement("div", { style: { marginTop: 16, fontSize: 13, color: C.muted } },
+          `Tu pedido: ${cantItems} items · `,
+          React.createElement("span", { style: { fontWeight: 900, color: C.warmDark, fontSize: 17 } }, "$" + total.toLocaleString())
+        )
+      )
+    ),
 
-      {/* NAME + KEYBOARD */}
-      {screen === SC.NAME && (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", background: `linear-gradient(150deg, ${C.warm} 0%, ${C.bg} 100%)` }}>
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "16px 20px 0" }}>
-            <div className="pop-in" style={{ width: "100%", maxWidth: 480, textAlign: "center" }}>
-              <div style={{ fontSize: 44, marginBottom: 8 }}>👋</div>
-              <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 28, fontWeight: 800, color: C.warmDark, marginBottom: 6 }}>¿Tu nombre?</h2>
-              <p style={{ fontSize: 14, color: C.muted, fontWeight: 600, marginBottom: 16 }}>Para avisarte cuando esté listo</p>
-              <div style={{ width: "100%", padding: "14px 20px", borderRadius: 16, border: `3px solid ${nombre ? C.accent : C.border}`, background: C.card, minHeight: 54, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
-                <span style={{ fontSize: 28, fontWeight: 800, color: nombre ? C.text : C.muted }}>{nombre || "Tocá las letras..."}</span>
-                {nombre && <span style={{ width: 3, height: 26, background: C.accent, marginLeft: 2, borderRadius: 2, animation: "blink 1s infinite" }} />}
-              </div>
-              <div style={{ fontSize: 13, color: C.muted }}>Total: <span style={{ fontWeight: 900, color: C.warmDark, fontSize: 17 }}>${total.toLocaleString()}</span></div>
-            </div>
-          </div>
-          <div style={{ padding: "10px 12px 16px", background: C.card, borderTop: `2px solid ${C.border}`, flexShrink: 0 }}>
-            {KB.map((row, ri) => (
-              <div key={ri} style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 6 }}>
-                {row.map(k => {
-                  const isSp = k === "⌫" || k === "OK"; const isOK = k === "OK";
-                  return (
-                    <button key={k} onClick={() => handleKey(k)} className="tap" style={{
-                      flex: isSp ? 1.5 : 1, maxWidth: isSp ? 90 : 54, height: 54, borderRadius: 12, border: "none", cursor: "pointer",
-                      background: isOK ? (nombre.trim() ? C.accent : C.border) : k === "⌫" ? C.warm : C.bg,
-                      color: isOK ? "#fff" : C.text, fontSize: isSp ? 15 : 20, fontWeight: 700, fontFamily: "'Nunito', sans-serif",
-                    }}>{k}</button>
-                  );
-                })}
-              </div>
-            ))}
-            <div style={{ display: "flex", justifyContent: "center", gap: 6 }}>
-              <button onClick={() => setScreen(SC.CATEGORIES)} className="tap" style={{ flex: 1, maxWidth: 90, height: 50, borderRadius: 12, border: `2px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>← Menú</button>
-              <button onClick={() => handleKey(" ")} className="tap" style={{ flex: 4, height: 50, borderRadius: 12, border: "none", background: C.bg, color: C.muted, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>espacio</button>
-              <button onClick={() => { if (nombre.trim()) setScreen(SC.CONFIRM); }} className="tap" style={{ flex: 1, maxWidth: 90, height: 50, borderRadius: 12, border: "none", background: nombre.trim() ? C.success : C.border, color: nombre.trim() ? "#fff" : C.muted, fontSize: 13, fontWeight: 800, cursor: "pointer" }}>Listo →</button>
-            </div>
-          </div>
-        </div>
-      )}
+    // NAME + KEYBOARD
+    screen === SC.NAME && React.createElement("div", {
+      style: { flex: 1, display: "flex", flexDirection: "column", background: `linear-gradient(150deg, ${C.warm} 0%, ${C.bg} 100%)` }
+    },
+      React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "16px 20px 0" } },
+        React.createElement("div", { className: "pop-in", style: { width: "100%", maxWidth: 480, textAlign: "center" } },
+          React.createElement("div", { style: { fontSize: 44, marginBottom: 8 } }, "👋"),
+          React.createElement("h2", { style: { fontFamily: "'Playfair Display', serif", fontSize: 28, fontWeight: 800, color: C.warmDark, marginBottom: 6 } }, "¿Tu nombre?"),
+          React.createElement("p", { style: { fontSize: 14, color: C.muted, fontWeight: 600, marginBottom: 16 } }, "Para avisarte cuando esté listo"),
+          React.createElement("div", {
+            style: { width: "100%", padding: "14px 20px", borderRadius: 16, border: `3px solid ${nombre ? C.accent : C.border}`, background: C.card, minHeight: 54, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }
+          },
+            React.createElement("span", { style: { fontSize: 28, fontWeight: 800, color: nombre ? C.text : C.muted } }, nombre || "Tocá las letras..."),
+            nombre && React.createElement("span", {
+              style: { width: 3, height: 26, background: C.accent, marginLeft: 2, borderRadius: 2, animation: "blink 1s infinite" }
+            })
+          ),
+          React.createElement("div", { style: { fontSize: 13, color: C.muted } },
+            "Total: ",
+            React.createElement("span", { style: { fontWeight: 900, color: C.warmDark, fontSize: 17 } }, "$" + total.toLocaleString())
+          )
+        )
+      ),
+      React.createElement("div", { style: { padding: "10px 12px 16px", background: C.card, borderTop: `2px solid ${C.border}`, flexShrink: 0 } },
+        KB.map((row, ri) =>
+          React.createElement("div", { key: ri, style: { display: "flex", justifyContent: "center", gap: 6, marginBottom: 6 } },
+            row.map(k => {
+              const isSp = k === "⌫" || k === "OK"; const isOK = k === "OK";
+              return React.createElement("button", {
+                key: k,
+                onClick: () => handleKey(k),
+                className: "tap",
+                style: {
+                  flex: isSp ? 1.5 : 1, maxWidth: isSp ? 90 : 54, height: 54, borderRadius: 12, border: "none", cursor: "pointer",
+                  background: isOK ? (nombre.trim() ? C.accent : C.border) : k === "⌫" ? C.warm : C.bg,
+                  color: isOK ? "#fff" : C.text, fontSize: isSp ? 15 : 20, fontWeight: 700, fontFamily: "'Nunito', sans-serif",
+                }
+              }, k);
+            })
+          )
+        ),
+        React.createElement("div", { style: { display: "flex", justifyContent: "center", gap: 6 } },
+          React.createElement("button", {
+            onClick: () => setScreen(SC.CATEGORIES),
+            className: "tap",
+            style: { flex: 1, maxWidth: 90, height: 50, borderRadius: 12, border: `2px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: 13, fontWeight: 700, cursor: "pointer" }
+          }, "← Menú"),
+          React.createElement("button", {
+            onClick: () => handleKey(" "),
+            className: "tap",
+            style: { flex: 4, height: 50, borderRadius: 12, border: "none", background: C.bg, color: C.muted, fontSize: 14, fontWeight: 600, cursor: "pointer" }
+          }, "espacio"),
+          React.createElement("button", {
+            onClick: () => { if (nombre.trim()) setScreen(SC.CONFIRM); },
+            className: "tap",
+            style: { flex: 1, maxWidth: 90, height: 50, borderRadius: 12, border: "none", background: nombre.trim() ? C.success : C.border, color: nombre.trim() ? "#fff" : C.muted, fontSize: 13, fontWeight: 800, cursor: "pointer" }
+          }, "Listo →")
+        )
+      )
+    ),
 
-      {/* CONFIRM */}
-      {screen === SC.CONFIRM && (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: C.bg, padding: 28 }}>
-          <div className="pop-in" style={{ width: "100%", maxWidth: 440, textAlign: "center" }}>
-            <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 800, color: C.warmDark, marginBottom: 18 }}>🛒 ¿Todo listo, {nombre}?</h2>
-            <div style={{ padding: 18, borderRadius: 16, background: C.card, border: `2px solid ${C.border}`, textAlign: "left", marginBottom: 20 }}>
-              {carrito.map(item => (
-                <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: `1px solid ${C.border}30` }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 8, background: item.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>{item.icon}</div>
-                  <div style={{ flex: 1 }}><div style={{ fontWeight: 700, fontSize: 14 }}>{item.nombre}</div><div style={{ fontSize: 12, color: C.muted }}>x{item.cantidad}</div></div>
-                  <span style={{ fontWeight: 800, fontSize: 15, color: C.accent }}>${(item.precio * item.cantidad).toLocaleString()}</span>
-                </div>
-              ))}
-              <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 12, marginTop: 6 }}>
-                <span style={{ fontSize: 17, fontWeight: 800 }}>Total a pagar</span>
-                <span style={{ fontSize: 24, fontWeight: 900, color: C.warmDark }}>${total.toLocaleString()}</span>
-              </div>
-            </div>
-            {errorEnvio && (
-              <div style={{ padding: "12px 16px", borderRadius: 12, background: "#FFF0F0", border: "2px solid #FF444440", marginBottom: 12, fontSize: 14, fontWeight: 700, color: "#CC0000" }}>
-                ⚠️ No se pudo enviar. Pedí en el mostrador o intentá de nuevo.
-              </div>
-            )}
-            <div style={{ display: "flex", gap: 12 }}>
-              <button onClick={() => setScreen(SC.CATEGORIES)} className="tap" style={{ flex: 1, padding: "16px 0", borderRadius: 14, border: `2px solid ${C.border}`, background: C.card, color: C.text, fontSize: 15, fontWeight: 700, cursor: "pointer" }}>← Modificar</button>
-              <button onClick={confirmarPedido} disabled={enviando} className="tap" style={{ flex: 2, padding: "16px 0", borderRadius: 14, border: "none", background: enviando ? C.border : C.success, color: enviando ? C.muted : "#fff", fontSize: 17, fontWeight: 800, cursor: enviando ? "default" : "pointer" }}>
-                {enviando ? "Enviando..." : "✅ ENVIAR PEDIDO"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+    // CONFIRM
+    screen === SC.CONFIRM && React.createElement("div", {
+      style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: C.bg, padding: 28 }
+    },
+      React.createElement("div", { className: "pop-in", style: { width: "100%", maxWidth: 440, textAlign: "center" } },
+        React.createElement("h2", {
+          style: { fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 800, color: C.warmDark, marginBottom: 18 }
+        }, "🛒 ¿Todo listo, " + nombre + "?"),
+        React.createElement("div", {
+          style: { padding: 18, borderRadius: 16, background: C.card, border: `2px solid ${C.border}`, textAlign: "left", marginBottom: 20 }
+        },
+          carrito.map(item =>
+            React.createElement("div", {
+              key: item.id,
+              style: { display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: `1px solid ${C.border}30` }
+            },
+              React.createElement("div", {
+                style: { width: 44, height: 44, borderRadius: 8, background: item.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }
+              }, item.icon),
+              React.createElement("div", { style: { flex: 1 } },
+                React.createElement("div", { style: { fontWeight: 700, fontSize: 14 } }, item.nombre),
+                React.createElement("div", { style: { fontSize: 12, color: C.muted } }, "x" + item.cantidad)
+              ),
+              React.createElement("span", { style: { fontWeight: 800, fontSize: 15, color: C.accent } }, "$" + (item.precio * item.cantidad).toLocaleString())
+            )
+          ),
+          React.createElement("div", { style: { display: "flex", justifyContent: "space-between", paddingTop: 12, marginTop: 6 } },
+            React.createElement("span", { style: { fontSize: 17, fontWeight: 800 } }, "Total a pagar"),
+            React.createElement("span", { style: { fontSize: 24, fontWeight: 900, color: C.warmDark } }, "$" + total.toLocaleString())
+          )
+        ),
+        errorEnvio && React.createElement("div", {
+          style: { padding: "12px 16px", borderRadius: 12, background: "#FFF0F0", border: "2px solid #FF444440", marginBottom: 12, fontSize: 14, fontWeight: 700, color: "#CC0000" }
+        }, "⚠️ No se pudo enviar. Pedí en el mostrador o intentá de nuevo."),
+        React.createElement("div", { style: { display: "flex", gap: 12 } },
+          React.createElement("button", {
+            onClick: () => setScreen(SC.CATEGORIES),
+            className: "tap",
+            style: { flex: 1, padding: "16px 0", borderRadius: 14, border: `2px solid ${C.border}`, background: C.card, color: C.text, fontSize: 15, fontWeight: 700, cursor: "pointer" }
+          }, "← Modificar"),
+          React.createElement("button", {
+            onClick: confirmarPedido,
+            disabled: enviando,
+            className: "tap",
+            style: { flex: 2, padding: "16px 0", borderRadius: 14, border: "none", background: enviando ? C.border : C.success, color: enviando ? C.muted : "#fff", fontSize: 17, fontWeight: 800, cursor: enviando ? "default" : "pointer" }
+          }, enviando ? "Enviando..." : "✅ ENVIAR PEDIDO")
+        )
+      )
+    ),
 
-      {/* DONE */}
-      {screen === SC.DONE && (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: `linear-gradient(150deg, ${C.successLight} 0%, ${C.bg} 100%)`, padding: 28 }}>
-          <div className="pop-in" style={{ textAlign: "center" }}>
-            <div className="bounce-in" style={{ width: 90, height: 90, borderRadius: "50%", background: C.success, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 44, margin: "0 auto 20px" }}>✓</div>
-            <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 34, fontWeight: 800, color: C.warmDark, marginBottom: 8 }}>¡Pedido enviado!</h2>
-            <div style={{ padding: "24px 44px", borderRadius: 22, background: C.card, border: `3px solid ${C.success}40`, display: "inline-block", marginBottom: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: C.muted, letterSpacing: "0.08em" }}>TU NÚMERO</div>
-              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 68, fontWeight: 900, color: C.success, lineHeight: 1 }}>#{numPedido}</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: C.warmDark, marginTop: 6 }}>{nombre}</div>
-            </div>
-            <div style={{ padding: "14px 24px", borderRadius: 14, background: C.warm, marginBottom: 16, maxWidth: 380 }}>
-              <div style={{ fontSize: 16, fontWeight: 800, color: C.warmDark }}>📢 Cuando tu pedido esté listo, te llamamos:</div>
-              <div style={{ fontSize: 28, fontWeight: 900, color: C.accent, marginTop: 4 }}>"{nombre}"</div>
-            </div>
-            <p style={{ fontSize: 14, color: C.muted, fontWeight: 600, marginBottom: 20 }}>Pagás cuando retirás en el mostrador</p>
-            <button onClick={resetear} className="tap" style={{ padding: "14px 36px", borderRadius: 14, border: `2px solid ${C.border}`, background: C.card, color: C.text, fontSize: 15, fontWeight: 700, cursor: "pointer" }}>Hacer otro pedido</button>
-            <div style={{ marginTop: 14, fontSize: 12, color: C.muted + "80" }}>Esta pantalla se reinicia automáticamente</div>
-          </div>
-        </div>
-      )}
-    </div>
+    // DONE
+    screen === SC.DONE && React.createElement("div", {
+      style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: `linear-gradient(150deg, ${C.successLight} 0%, ${C.bg} 100%)`, padding: 28 }
+    },
+      React.createElement("div", { className: "pop-in", style: { textAlign: "center" } },
+        React.createElement("div", {
+          className: "bounce-in",
+          style: { width: 90, height: 90, borderRadius: "50%", background: C.success, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 44, margin: "0 auto 20px" }
+        }, "✓"),
+        React.createElement("h2", {
+          style: { fontFamily: "'Playfair Display', serif", fontSize: 34, fontWeight: 800, color: C.warmDark, marginBottom: 8 }
+        }, "¡Pedido enviado!"),
+        React.createElement("div", {
+          style: { padding: "24px 44px", borderRadius: 22, background: C.card, border: `3px solid ${C.success}40`, display: "inline-block", marginBottom: 16 }
+        },
+          React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: C.muted, letterSpacing: "0.08em" } }, "TU NÚMERO"),
+          React.createElement("div", {
+            style: { fontFamily: "'Playfair Display', serif", fontSize: 68, fontWeight: 900, color: C.success, lineHeight: 1 }
+          }, "#" + numPedido),
+          React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: C.warmDark, marginTop: 6 } }, nombre)
+        ),
+        React.createElement("div", {
+          style: { padding: "14px 24px", borderRadius: 14, background: C.warm, marginBottom: 16, maxWidth: 380 }
+        },
+          React.createElement("div", { style: { fontSize: 16, fontWeight: 800, color: C.warmDark } }, "📢 Cuando tu pedido esté listo, te llamamos:"),
+          React.createElement("div", { style: { fontSize: 28, fontWeight: 900, color: C.accent, marginTop: 4 } }, '"' + nombre + '"')
+        ),
+        React.createElement("p", { style: { fontSize: 14, color: C.muted, fontWeight: 600, marginBottom: 20 } }, "Pagás cuando retirás en el mostrador"),
+        React.createElement("button", {
+          onClick: resetear,
+          className: "tap",
+          style: { padding: "14px 36px", borderRadius: 14, border: `2px solid ${C.border}`, background: C.card, color: C.text, fontSize: 15, fontWeight: 700, cursor: "pointer" }
+        }, "Hacer otro pedido"),
+        React.createElement("div", { style: { marginTop: 14, fontSize: 12, color: C.muted + "80" } }, "Esta pantalla se reinicia automáticamente")
+      )
+    )
   );
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(window.__App));
 </script>
+<style>#fs-btn{position:fixed;bottom:18px;right:18px;z-index:9999;padding:14px 22px;background:rgba(20,24,36,0.9);color:#fff;border:1px solid rgba(255,255,255,0.18);border-radius:12px;font-size:15px;font-weight:800;letter-spacing:.04em;cursor:pointer;touch-action:manipulation;backdrop-filter:blur(8px);box-shadow:0 4px 20px rgba(0,0,0,.5)}#fs-btn.fs-hidden{display:none}</style>
+<button id="fs-btn">⛶ PANTALLA COMPLETA</button>
+<script>(function(){var b=document.getElementById('fs-btn');b.onclick=function(){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();};document.addEventListener('fullscreenchange',function(){b.classList.toggle('fs-hidden',!!document.fullscreenElement);});})();</script>
 </body>
 </html>

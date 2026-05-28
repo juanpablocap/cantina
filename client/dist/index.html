@@ -293,6 +293,18 @@ window.__App = function CantinaFull() {
 
   const S_login = THEMES[theme];
 
+  // Login keyboard: digits → PIN, Backspace → delete last digit
+  useEffect(() => {
+    if (loggedIn) return;
+    const h = (e) => {
+      if (/^\d$/.test(e.key)) handleLoginKey(e.key);
+      else if (e.key === 'Backspace') handleLoginKey('back');
+      else if (e.key === 'Delete' || e.key === 'Escape') handleLoginKey('clear');
+    };
+    document.addEventListener('keydown', h);
+    return () => document.removeEventListener('keydown', h);
+  }, [loggedIn, loginPin]);
+
   // ===== MAIN APP (after login) =====
   const [tab, setTab] = useState("venta");
   const [categorias, setCategorias] = useState(CATEGORIAS_FALLBACK);
@@ -353,6 +365,10 @@ window.__App = function CantinaFull() {
   const [backupModal, setBackupModal] = useState(null); // null | { status, message }
   const [masSheet, setMasSheet] = useState(false); // Modern POS v2 "Más" drawer
   const mesaInputRef = useRef(null);
+  const busquedaRef = useRef(null);
+  const [editingCartItem, setEditingCartItem] = useState(null); // { producto_id, field: 'qty'|'precio', value }
+  const [editingProd, setEditingProd] = useState(null); // { id, field: 'stock'|'precio', value }
+  const [mesaKeyInput, setMesaKeyInput] = useState("");
 
   // Load data from API on login
   useEffect(() => {
@@ -457,6 +473,77 @@ window.__App = function CantinaFull() {
     const iv = setInterval(fetchSys, 5000);
     return () => clearInterval(iv);
   }, [loggedIn, dataLoaded]);
+
+  // === GLOBAL KEYBOARD SHORTCUTS ===
+  useEffect(() => {
+    if (!loggedIn) return;
+    const handleGlobalKey = (e) => {
+      const activeEl = document.activeElement;
+      const isInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT' || activeEl.isContentEditable);
+
+      // Escape: close modals in priority order
+      if (e.key === 'Escape') {
+        if (touchKb) { setTouchKb(null); return; }
+        if (touchNum) { setTouchNum(null); return; }
+        if (cobrandoPedido) { setCobrandoPedido(null); return; }
+        if (cancelarPedido) { setCancelarPedido(null); return; }
+        if (agregarItemPedido) { setAgregarItemPedido(null); return; }
+        if (editarPedido) { setEditarPedido(null); return; }
+        if (pinModal) { setPinModal(null); return; }
+        if (reporteCierre) { setReporteCierre(null); return; }
+        if (cierreCaja) { setCierreCaja(null); return; }
+        if (backupModal) { setBackupModal(null); return; }
+        if (masSheet) { setMasSheet(false); return; }
+        if (editingCartItem) { setEditingCartItem(null); return; }
+        if (editingProd) { setEditingProd(null); return; }
+        if (mesaKeyInput) { setMesaKeyInput(""); return; }
+        if (busqueda) { setBusqueda(""); return; }
+        return;
+      }
+
+      // Skip if any overlay modal is open
+      if (touchKb || touchNum || cobrandoPedido || cancelarPedido || agregarItemPedido || editarPedido || pinModal || reporteCierre || cierreCaja) return;
+
+      // VENTA tab: typing starts/continues product search
+      if (tab === 'venta' && !isInput) {
+        if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+          e.preventDefault();
+          setBusqueda(prev => prev + e.key);
+          busquedaRef.current?.focus();
+          return;
+        }
+        if (e.key === 'Backspace' && busqueda) {
+          e.preventDefault();
+          setBusqueda(prev => prev.slice(0, -1));
+          busquedaRef.current?.focus();
+          return;
+        }
+      }
+
+      // MESAS tab: type mesa number, Enter to select
+      if (tab === 'mesas' && !isInput) {
+        if (/^\d$/.test(e.key)) {
+          e.preventDefault();
+          setMesaKeyInput(prev => (prev + e.key).slice(-2));
+          return;
+        }
+        if (e.key === 'Enter' && mesaKeyInput) {
+          e.preventDefault();
+          const num = Number(mesaKeyInput);
+          if (num >= 1 && num <= MESAS_TOTAL) setMesaSeleccionada(prev => prev === num ? null : num);
+          setMesaKeyInput("");
+          return;
+        }
+        if (e.key === 'Backspace') {
+          e.preventDefault();
+          setMesaKeyInput(prev => prev.slice(0, -1));
+          return;
+        }
+      }
+    };
+    document.addEventListener('keydown', handleGlobalKey);
+    return () => document.removeEventListener('keydown', handleGlobalKey);
+  }, [loggedIn, tab, touchKb, touchNum, cobrandoPedido, cancelarPedido, agregarItemPedido, editarPedido, pinModal, reporteCierre, cierreCaja, backupModal, masSheet, busqueda, editingCartItem, editingProd, mesaKeyInput, mesaSeleccionada]);
 
   // === SOUNDS (must be before conditional return) ===
   const playCajaSendSound = useCallback(() => {
@@ -1124,7 +1211,16 @@ window.__App = function CantinaFull() {
               </div>
               {tipoPedido === "mesa" && (
                 theme !== 'classic' ? (
-                  <div ref={mesaInputRef} className={mesaFlash ? "flash-field" : ""} style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 5, maxHeight: theme === 'tablet' ? 162 : 118, overflowY: "auto" }}>
+                  <>
+                  <input
+                    type="number" min="1" max={MESAS_TOTAL}
+                    value={mesaNum}
+                    onChange={e => { const v = e.target.value; if (v === "" || (Number(v) >= 1 && Number(v) <= MESAS_TOTAL)) setMesaNum(v); }}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); enviarPedido(); } if (e.key === 'Escape') { e.preventDefault(); setMesaNum(""); } }}
+                    placeholder="N° mesa (1-40)"
+                    style={{ marginTop: 8, width: "100%", padding: "7px 12px", borderRadius: 9, border: `2px solid ${mesaNum ? S.accent : S.border}`, background: S.surfaceHover, color: S.text, fontSize: 14, fontWeight: 800, outline: "none", fontFamily: "'DM Sans', sans-serif" }}
+                  />
+                  <div ref={mesaInputRef} className={mesaFlash ? "flash-field" : ""} style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 5, maxHeight: theme === 'tablet' ? 162 : 118, overflowY: "auto" }}>
                     {Array.from({ length: MESAS_TOTAL }, (_, i) => i + 1).map(n => (
                       <button key={n} onClick={() => setMesaNum(String(n))} style={{
                         height: theme === 'tablet' ? 48 : 38, borderRadius: 9, border: `2px solid ${mesaNum === String(n) ? S.accent : S.border}`,
@@ -1133,6 +1229,7 @@ window.__App = function CantinaFull() {
                       }}>{n}</button>
                     ))}
                   </div>
+                  </>
                 ) : (
                   <div ref={mesaInputRef} className={mesaFlash ? "flash-field" : ""} style={{ marginTop: 8, display: "flex", gap: 4, overflowX: "auto", paddingBottom: 4 }}>
                     {Array.from({ length: MESAS_TOTAL }, (_, i) => i + 1).map(n => (
@@ -1146,10 +1243,14 @@ window.__App = function CantinaFull() {
                 )
               )}
               {tipoPedido === "barra" && (
-                <button onClick={() => setTouchKb({ field: "nombreBarra", title: "NOMBRE (BARRA)", value: nombreBarra })}
-                  style={{ marginTop: 8, width: "100%", padding: theme === 'modern' ? "12px 14px" : "10px 12px", borderRadius: 10, border: `2px solid ${nombreBarra ? S.accent : S.border}`, background: S.surfaceHover, color: nombreBarra ? S.text : S.muted, fontSize: 13, textAlign: "left", cursor: "pointer", fontWeight: nombreBarra ? 700 : 400 }}>
-                  {nombreBarra || "📢 Nombre (opcional) — tocar para escribir"}
-                </button>
+                <input
+                  type="text"
+                  value={nombreBarra}
+                  onChange={e => setNombreBarra(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); enviarPedido(); } }}
+                  placeholder="📢 Nombre (opcional)"
+                  style={{ marginTop: 8, width: "100%", padding: theme === 'modern' ? "12px 14px" : "10px 12px", borderRadius: 10, border: `2px solid ${nombreBarra ? S.accent : S.border}`, background: S.surfaceHover, color: S.text, fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none" }}
+                />
               )}
             </div>
 
@@ -1168,11 +1269,34 @@ window.__App = function CantinaFull() {
                     <div key={item.producto_id} className="anim-in" style={{ padding: theme === 'modern' ? "14px 0" : "12px 0", borderBottom: `1px solid ${S.border}` }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                         <span style={{ fontWeight: 700, fontSize: theme === 'tablet' ? 15 : theme === 'modern' ? 14 : 13, color: S.text, flex: 1, lineHeight: 1.3 }}>{itemNombre(item)}</span>
-                        <span style={{ fontWeight: 900, fontSize: theme === 'tablet' ? 15 : theme === 'modern' ? 15 : 13, color: S.accent, whiteSpace: "nowrap" }}>${(item.precio * item.cantidad).toLocaleString()}</span>
+                        {editingCartItem?.producto_id === item.producto_id && editingCartItem?.field === 'precio' ? (
+                          <input type="number" min="1" autoFocus value={editingCartItem.value}
+                            onChange={e => setEditingCartItem(prev => ({...prev, value: e.target.value}))}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); const p = Math.max(0, Number(editingCartItem.value) || 0); setCarrito(prev => prev.map(i => i.producto_id === item.producto_id ? {...i, precio: p} : i)); setEditingCartItem(null); }
+                              if (e.key === 'Escape') setEditingCartItem(null);
+                            }}
+                            onBlur={() => { const p = Math.max(0, Number(editingCartItem?.value) || 0); setCarrito(prev => prev.map(i => i.producto_id === item.producto_id ? {...i, precio: p} : i)); setEditingCartItem(null); }}
+                            style={{ width: 80, textAlign: "right", background: S.bg, border: `2px solid ${S.accent}`, borderRadius: 7, color: S.accent, fontSize: 14, fontWeight: 900, padding: "2px 6px", outline: "none" }} />
+                        ) : (
+                          <span title="Clic para editar precio" onClick={() => setEditingCartItem({ producto_id: item.producto_id, field: 'precio', value: String(item.precio) })} style={{ fontWeight: 900, fontSize: theme === 'tablet' ? 15 : theme === 'modern' ? 15 : 13, color: S.accent, whiteSpace: "nowrap", cursor: "text", borderRadius: 4, padding: "1px 3px" }}>${(item.precio * item.cantidad).toLocaleString()}</span>
+                        )}
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: theme === 'modern' ? 10 : 8 }}>
                         <button onClick={() => quitarItem(item.producto_id)} style={{ width: qBtnSize, height: qBtnSize, borderRadius: 10, border: `1px solid ${S.border}`, background: S.surfaceHover, color: S.text, fontWeight: 900, cursor: "pointer", fontSize: 18, flexShrink: 0 }}>−</button>
-                        <span style={{ fontWeight: 900, fontSize: theme === 'modern' ? 17 : 15, width: 28, textAlign: "center" }}>{item.cantidad}</span>
+                        {editingCartItem?.producto_id === item.producto_id && editingCartItem?.field === 'qty' ? (
+                          <input type="number" min="1" autoFocus value={editingCartItem.value}
+                            onChange={e => setEditingCartItem(prev => ({...prev, value: e.target.value}))}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') { e.preventDefault(); const q = Math.max(1, parseInt(editingCartItem.value) || 1); setCarrito(prev => prev.map(i => i.producto_id === item.producto_id ? {...i, cantidad: q} : i)); setEditingCartItem(null); }
+                              if (e.key === 'Tab') { e.preventDefault(); const q = Math.max(1, parseInt(editingCartItem.value) || 1); setCarrito(prev => prev.map(i => i.producto_id === item.producto_id ? {...i, cantidad: q} : i)); setEditingCartItem({ producto_id: item.producto_id, field: 'precio', value: String(item.precio) }); }
+                              if (e.key === 'Escape') setEditingCartItem(null);
+                            }}
+                            onBlur={() => { const q = Math.max(1, parseInt(editingCartItem?.value) || 1); setCarrito(prev => prev.map(i => i.producto_id === item.producto_id ? {...i, cantidad: q} : i)); setEditingCartItem(null); }}
+                            style={{ width: 48, textAlign: "center", background: S.bg, border: `2px solid ${S.accent}`, borderRadius: 7, color: S.text, fontSize: 15, fontWeight: 900, padding: "2px 4px", outline: "none" }} />
+                        ) : (
+                          <span title="Clic para editar cantidad" onClick={() => setEditingCartItem({ producto_id: item.producto_id, field: 'qty', value: String(item.cantidad) })} style={{ fontWeight: 900, fontSize: theme === 'modern' ? 17 : 15, width: 28, textAlign: "center", cursor: "text", borderRadius: 4 }}>{item.cantidad}</span>
+                        )}
                         <button onClick={() => { const p = productos.find(x => x.id === item.producto_id); if (p) agregarItem(p); }} style={{ width: qBtnSize, height: qBtnSize, borderRadius: 10, border: `1px solid ${S.border}`, background: S.surfaceHover, color: S.text, fontWeight: 900, cursor: "pointer", fontSize: 18, flexShrink: 0 }}>+</button>
                         <div style={{ flex: 1 }} />
                         <button onClick={() => eliminarItem(item.producto_id)} style={{ width: qBtnSize, height: qBtnSize, borderRadius: 10, background: S.danger + "18", color: S.danger, border: `1px solid ${S.danger}25`, cursor: "pointer", fontSize: theme === 'modern' ? 18 : 14, flexShrink: 0 }}>🗑</button>
@@ -1237,8 +1361,32 @@ window.__App = function CantinaFull() {
           <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
             {/* LEFT: Catalog */}
             <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              {/* Search bar */}
+              <div style={{ padding: theme === 'modern' ? "10px 18px 6px" : "8px 16px 4px", flexShrink: 0, display: "flex", alignItems: "center", gap: 8, background: theme === 'modern' ? S.surface : "transparent" }}>
+                <input
+                  ref={busquedaRef}
+                  type="text"
+                  value={busqueda}
+                  onChange={e => { setBusqueda(e.target.value); setCatActiva(null); }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      const first = productosFiltrados.find(p => p.stock > 0);
+                      if (first) { agregarItem(first); setBusqueda(""); busquedaRef.current?.blur(); }
+                      e.preventDefault();
+                    }
+                  }}
+                  placeholder="🔍 Buscar... (Enter agrega el primero)"
+                  style={{ flex: 1, padding: "8px 14px", borderRadius: 10, border: `2px solid ${busqueda ? S.accent : S.border}`, background: busqueda ? S.accent + "15" : S.surfaceHover, color: S.text, fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none" }}
+                />
+                {busqueda && (
+                  <span style={{ fontSize: 11, color: S.muted, whiteSpace: "nowrap" }}>{productosFiltrados.length} resultado{productosFiltrados.length !== 1 ? 's' : ''}</span>
+                )}
+                {busqueda && (
+                  <button onClick={() => { setBusqueda(""); busquedaRef.current?.focus(); }} style={{ padding: "6px 10px", borderRadius: 8, border: "none", background: S.border, color: S.text, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>✕</button>
+                )}
+              </div>
               {/* Categories */}
-              <div style={{ display: "flex", gap: theme === 'modern' ? 8 : 8, padding: theme === 'modern' ? "14px 18px" : "12px 16px", overflowX: "auto", flexShrink: 0, borderBottom: `1px solid ${S.border}`, background: theme === 'modern' ? S.surface : "transparent" }}>
+              <div style={{ display: "flex", gap: theme === 'modern' ? 8 : 8, padding: theme === 'modern' ? "6px 18px 14px" : "4px 16px 12px", overflowX: "auto", flexShrink: 0, borderBottom: `1px solid ${S.border}`, background: theme === 'modern' ? S.surface : "transparent" }}>
                 <button onClick={() => setCatActiva(null)} style={{
                   padding: theme === 'modern' ? "10px 18px" : "8px 16px", borderRadius: 12,
                   border: `2px solid ${!catActiva ? S.accent : S.border}`,
@@ -1443,8 +1591,13 @@ window.__App = function CantinaFull() {
           <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
             {theme !== 'tablet' ? (
               <>
-                <div style={{ padding: "12px 16px 4px", fontSize: 10, fontWeight: 800, color: S.muted, letterSpacing: "0.06em", flexShrink: 0 }}>
-                  MESAS — {activas} ocupadas de {MESAS_TOTAL}
+                <div style={{ padding: "12px 16px 4px", fontSize: 10, fontWeight: 800, color: S.muted, letterSpacing: "0.06em", flexShrink: 0, display: "flex", alignItems: "center", gap: 12 }}>
+                  <span>MESAS — {activas} ocupadas de {MESAS_TOTAL}</span>
+                  {mesaKeyInput && (
+                    <span style={{ padding: "4px 12px", borderRadius: 8, background: S.accent, color: "#fff", fontSize: 13, fontWeight: 900, letterSpacing: "0.04em" }}>
+                      → Mesa {mesaKeyInput} <span style={{ fontSize: 10, opacity: 0.8 }}>Enter para seleccionar</span>
+                    </span>
+                  )}
                 </div>
                 <div style={{ flex: 1, display: "flex", flexWrap: "wrap", gap: 6, alignContent: "flex-start", overflow: "auto", padding: "8px 16px 12px" }}>
                   {Array.from({ length: MESAS_TOTAL }, (_, i) => i + 1).map(num => {
@@ -1639,10 +1792,10 @@ window.__App = function CantinaFull() {
                     ))}
 
                     {/* Nota */}
-                    <button onClick={() => setTouchKb({ field: "mesaNota_" + sel, title: "NOTA MESA " + sel, value: mesaNotas[sel] || "" })}
-                      style={{ width: "100%", padding: "6px 10px", borderRadius: 6, border: `1px solid ${S.border}`, background: S.bg, color: mesaNotas[sel] ? S.text : S.muted, fontSize: 11, textAlign: "left", cursor: "pointer", marginBottom: 10 }}>
-                      {mesaNotas[sel] || "📝 Agregar nota..."}
-                    </button>
+                    <input type="text" value={mesaNotas[sel] || ""}
+                      onChange={e => setMesaNotas(prev => ({...prev, [sel]: e.target.value}))}
+                      placeholder="📝 Agregar nota..."
+                      style={{ width: "100%", padding: "6px 10px", borderRadius: 6, border: `1px solid ${S.border}`, background: S.bg, color: S.text, fontSize: 11, outline: "none", marginBottom: 10, fontFamily: "'DM Sans', sans-serif" }} />
 
                     {/* Total + actions */}
                     <div style={{ borderTop: `1px solid ${S.border}`, paddingTop: 10 }}>
@@ -1872,23 +2025,41 @@ window.__App = function CantinaFull() {
               <div style={{ fontSize: 12, fontWeight: 800, color: S.accent, marginBottom: 12 }}>
                 {clienteForm.mode === "nuevo" ? "➕ NUEVO CLIENTE" : "✏️ EDITAR CLIENTE"}
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                {[
-                  ["nombre", "Nombre *"],
-                  ["apellido", "Apellido"],
-                  ["apodo", "Apodo"],
-                  ["division", "División / Sector"],
-                  ["whatsapp", "WhatsApp"],
-                ].map(([key, label]) => (
-                  <div key={key} style={{ gridColumn: key === "whatsapp" ? "span 2" : undefined }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: S.muted, marginBottom: 4 }}>{label}</div>
-                    <button onClick={() => key === "whatsapp" ? setTouchNum({ field: "clienteForm_" + key, title: label.toUpperCase(), value: clienteForm[key], prefix: "", maxLen: 13 }) : setTouchKb({ field: "clienteForm_" + key, title: label.toUpperCase(), value: clienteForm[key] })}
-                      style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `2px solid ${clienteForm[key] ? S.accent : S.border}`, background: S.bg, color: clienteForm[key] ? S.text : S.muted, fontSize: 13, textAlign: "left", cursor: "pointer" }}>
-                      {clienteForm[key] || "Tocar para escribir"}
-                    </button>
+              {(() => {
+                const guardarCliente = async () => {
+                  if (!clienteForm.nombre.trim()) return;
+                  if (clienteForm.mode === "nuevo") {
+                    const result = await apiFetch('/clientes', { method: 'POST', body: { nombre: clienteForm.nombre, apellido: clienteForm.apellido || "", apodo: clienteForm.apodo || "", division: clienteForm.division || "", whatsapp: clienteForm.whatsapp || "" } });
+                    if (result) { setClientes(prev => [...prev, result]); setNextClienteId(result.id + 1); showMsg("✅ Cliente agregado"); }
+                  } else {
+                    const result = await apiFetch(`/clientes/${clienteForm.id}`, { method: 'PUT', body: { nombre: clienteForm.nombre, apellido: clienteForm.apellido || "", apodo: clienteForm.apodo || "", division: clienteForm.division || "", whatsapp: clienteForm.whatsapp || "" } });
+                    if (result) { setClientes(prev => prev.map(c => c.id === clienteForm.id ? result : c)); showMsg("✅ Cliente actualizado"); }
+                  }
+                  setClienteForm(null);
+                };
+                const campos = [["nombre", "Nombre *"], ["apellido", "Apellido"], ["apodo", "Apodo"], ["division", "División / Sector"], ["whatsapp", "WhatsApp"]];
+                return (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    {campos.map(([key, label], idx) => (
+                      <div key={key} style={{ gridColumn: key === "whatsapp" ? "span 2" : undefined }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: S.muted, marginBottom: 4 }}>{label}</div>
+                        <input
+                          type={key === "whatsapp" ? "tel" : "text"}
+                          value={clienteForm[key]}
+                          autoFocus={idx === 0}
+                          onChange={e => setClienteForm(prev => ({...prev, [key]: e.target.value}))}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') { e.preventDefault(); if (idx === campos.length - 1 || key === 'nombre') guardarCliente(); }
+                            if (e.key === 'Escape') { e.preventDefault(); setClienteForm(null); }
+                          }}
+                          placeholder={label}
+                          style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `2px solid ${clienteForm[key] ? S.accent : S.border}`, background: S.bg, color: S.text, fontSize: 13, outline: "none", fontFamily: "'DM Sans', sans-serif" }}
+                        />
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                );
+              })()}
               <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
                 <button onClick={async () => {
                   if (!clienteForm.nombre.trim()) return;
@@ -1934,10 +2105,19 @@ window.__App = function CantinaFull() {
                 <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: S.muted, marginBottom: 4 }}>Monto del pago</div>
-                    <button onClick={() => setTouchNum({ field: "pagoMonto", title: "MONTO DEL PAGO", value: pagoForm.monto, prefix: "$", maxLen: 8 })}
-                      style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `2px solid ${S.border}`, background: S.bg, color: pagoForm.monto ? S.text : S.muted, fontSize: 18, fontWeight: 800, textAlign: "left", cursor: "pointer" }}>
-                      {pagoForm.monto ? "$" + Number(pagoForm.monto).toLocaleString() : "$0 — tocar para ingresar"}
-                    </button>
+                    <input
+                      type="number"
+                      min="0"
+                      autoFocus
+                      value={pagoForm.monto}
+                      onChange={e => setPagoForm(prev => ({...prev, monto: e.target.value.replace(/\D/g, '')}))}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && valido) { e.preventDefault(); setPinModal({ action: "pagar", clienteId: cli.id, pagoMonto: montoVal, pin: "" }); }
+                        if (e.key === 'Escape') { e.preventDefault(); setPagoForm(null); }
+                      }}
+                      placeholder="$0"
+                      style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `2px solid ${pagoForm.monto ? S.accent : S.border}`, background: S.bg, color: S.text, fontSize: 18, fontWeight: 800, outline: "none", fontFamily: "'DM Sans', sans-serif" }}
+                    />
                   </div>
                   <button onClick={() => setPagoForm(prev => ({ ...prev, monto: String(cli.saldo) }))} style={{
                     padding: "10px 16px", borderRadius: 10, border: `1px solid ${S.border}`, background: S.bg,
@@ -2145,10 +2325,11 @@ window.__App = function CantinaFull() {
                 {/* Nombre */}
                 <div style={{ gridColumn: "span 2" }}>
                   <div style={{ fontSize: 9, fontWeight: 700, color: S.muted, marginBottom: 3 }}>Nombre</div>
-                  <button onClick={() => setTouchKb({ field: "categoriaForm_nombre", title: "NOMBRE DE LA CATEGORÍA", value: categoriaForm.nombre })}
-                    style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: `2px solid ${categoriaForm.nombre ? S.accent : S.border}`, background: S.bg, color: categoriaForm.nombre ? S.text : S.muted, fontSize: 13, textAlign: "left", cursor: "pointer" }}>
-                    {categoriaForm.nombre || "Tocar para escribir"}
-                  </button>
+                  <input type="text" autoFocus value={categoriaForm.nombre}
+                    onChange={e => setCategoriaForm(prev => prev ? ({...prev, nombre: e.target.value}) : null)}
+                    onKeyDown={e => { if (e.key === 'Escape') setCategoriaForm(null); }}
+                    placeholder="Nombre de la categoría"
+                    style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: `2px solid ${categoriaForm.nombre ? S.accent : S.border}`, background: S.bg, color: S.text, fontSize: 13, outline: "none", fontFamily: "'DM Sans', sans-serif" }} />
                 </div>
                 {/* Emoji */}
                 <div>
@@ -2231,24 +2412,27 @@ window.__App = function CantinaFull() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
                 <div style={{ gridColumn: "span 2" }}>
                   <div style={{ fontSize: 9, fontWeight: 700, color: S.muted, marginBottom: 3 }}>Nombre</div>
-                  <button onClick={() => setTouchKb({ field: "productoForm_nombre", title: "NOMBRE DEL PRODUCTO", value: productoForm.nombre })}
-                    style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: `2px solid ${productoForm.nombre ? S.accent : S.border}`, background: S.bg, color: productoForm.nombre ? S.text : S.muted, fontSize: 13, textAlign: "left", cursor: "pointer" }}>
-                    {productoForm.nombre || "Tocar para escribir"}
-                  </button>
+                  <input type="text" autoFocus value={productoForm.nombre}
+                    onChange={e => setProductoForm(prev => prev ? ({...prev, nombre: e.target.value}) : null)}
+                    onKeyDown={e => { if (e.key === 'Escape') setProductoForm(null); }}
+                    placeholder="Nombre del producto"
+                    style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: `2px solid ${productoForm.nombre ? S.accent : S.border}`, background: S.bg, color: S.text, fontSize: 13, outline: "none", fontFamily: "'DM Sans', sans-serif" }} />
                 </div>
                 <div>
                   <div style={{ fontSize: 9, fontWeight: 700, color: S.muted, marginBottom: 3 }}>Precio</div>
-                  <button onClick={() => setTouchNum({ field: "productoForm_precio", title: "PRECIO", value: productoForm.precio, prefix: "$", maxLen: 7 })}
-                    style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: `2px solid ${productoForm.precio ? S.accent : S.border}`, background: S.bg, color: productoForm.precio ? S.text : S.muted, fontSize: 13, textAlign: "left", cursor: "pointer" }}>
-                    {productoForm.precio ? "$" + Number(productoForm.precio).toLocaleString() : "$0"}
-                  </button>
+                  <input type="number" min="0" value={productoForm.precio}
+                    onChange={e => setProductoForm(prev => prev ? ({...prev, precio: e.target.value}) : null)}
+                    onKeyDown={e => { if (e.key === 'Escape') setProductoForm(null); }}
+                    placeholder="0"
+                    style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: `2px solid ${productoForm.precio ? S.accent : S.border}`, background: S.bg, color: S.text, fontSize: 13, outline: "none", fontFamily: "'DM Sans', sans-serif" }} />
                 </div>
                 <div>
                   <div style={{ fontSize: 9, fontWeight: 700, color: S.muted, marginBottom: 3 }}>Stock inicial</div>
-                  <button onClick={() => setTouchNum({ field: "productoForm_stock", title: "STOCK", value: productoForm.stock, prefix: "", maxLen: 5 })}
-                    style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: `2px solid ${S.border}`, background: S.bg, color: S.text, fontSize: 13, textAlign: "left", cursor: "pointer" }}>
-                    {productoForm.stock || "0"}
-                  </button>
+                  <input type="number" min="0" value={productoForm.stock}
+                    onChange={e => setProductoForm(prev => prev ? ({...prev, stock: e.target.value}) : null)}
+                    onKeyDown={e => { if (e.key === 'Escape') setProductoForm(null); }}
+                    placeholder="0"
+                    style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: `2px solid ${S.border}`, background: S.bg, color: S.text, fontSize: 13, outline: "none", fontFamily: "'DM Sans', sans-serif" }} />
                 </div>
                 <div>
                   <div style={{ fontSize: 9, fontWeight: 700, color: S.muted, marginBottom: 3 }}>Categoría</div>
@@ -2351,7 +2535,18 @@ window.__App = function CantinaFull() {
                           </div>
                         </div>
                         <div style={{ textAlign: "right", marginRight: 8 }}>
-                          <div style={{ fontWeight: 900, fontSize: 16, color: S.accent }}>${p.precio.toLocaleString()}</div>
+                          {editingProd?.id === p.id && editingProd?.field === 'precio' ? (
+                            <input type="number" min="0" autoFocus value={editingProd.value}
+                              onChange={e => setEditingProd(prev => ({...prev, value: e.target.value}))}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); const np = Math.max(0, Number(editingProd.value) || 0); setProductos(prev => prev.map(x => x.id === p.id ? {...x, precio: np} : x)); apiFetch(`/productos/${p.id}`, { method: 'PUT', body: { nombre: p.nombre, precio: np, stock: p.stock, cat_id: p.cat_id, cocina: p.cocina } }); if (e.key === 'Tab') { setEditingProd({ id: p.id, field: 'stock', value: String(p.stock) }); } else setEditingProd(null); }
+                                if (e.key === 'Escape') setEditingProd(null);
+                              }}
+                              onBlur={() => { if (editingProd?.field === 'precio') { const np = Math.max(0, Number(editingProd.value) || 0); setProductos(prev => prev.map(x => x.id === p.id ? {...x, precio: np} : x)); apiFetch(`/productos/${p.id}`, { method: 'PUT', body: { nombre: p.nombre, precio: np, stock: p.stock, cat_id: p.cat_id, cocina: p.cocina } }); setEditingProd(null); } }}
+                              style={{ width: 90, textAlign: "right", background: S.bg, border: `2px solid ${S.accent}`, borderRadius: 8, color: S.accent, fontSize: 15, fontWeight: 900, padding: "4px 8px", outline: "none" }} />
+                          ) : (
+                            <div title="Clic para editar precio" onClick={() => setEditingProd({ id: p.id, field: 'precio', value: String(p.precio) })} style={{ fontWeight: 900, fontSize: 16, color: S.accent, cursor: "text", borderRadius: 6, padding: "2px 4px" }}>${p.precio.toLocaleString()}</div>
+                          )}
                         </div>
                         {/* Stock +/- controls */}
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -2359,11 +2554,22 @@ window.__App = function CantinaFull() {
                             width: 32, height: 32, borderRadius: 8, border: `1px solid ${S.border}`, background: S.bg,
                             color: S.text, fontSize: 16, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
                           }}>−</button>
-                          <button onClick={() => setTouchNum({ field: "stock_" + p.id, title: "STOCK — " + p.nombre, value: String(p.stock), prefix: "", maxLen: 5 })} style={{
+                          {editingProd?.id === p.id && editingProd?.field === 'stock' ? (
+                            <input type="number" min="0" autoFocus value={editingProd.value}
+                              onChange={e => setEditingProd(prev => ({...prev, value: e.target.value}))}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); const ns = Math.max(0, Number(editingProd.value) || 0); setProductos(prev => prev.map(x => x.id === p.id ? {...x, stock: ns} : x)); apiFetch(`/productos/${p.id}`, { method: 'PUT', body: { nombre: p.nombre, precio: p.precio, stock: ns, cat_id: p.cat_id, cocina: p.cocina } }); setEditingProd(null); }
+                                if (e.key === 'Escape') setEditingProd(null);
+                              }}
+                              onBlur={() => { if (editingProd?.field === 'stock') { const ns = Math.max(0, Number(editingProd.value) || 0); setProductos(prev => prev.map(x => x.id === p.id ? {...x, stock: ns} : x)); apiFetch(`/productos/${p.id}`, { method: 'PUT', body: { nombre: p.nombre, precio: p.precio, stock: ns, cat_id: p.cat_id, cocina: p.cocina } }); setEditingProd(null); } }}
+                              style={{ width: 52, textAlign: "center", background: S.bg, border: `2px solid ${stockBajo ? S.danger : S.accent}`, borderRadius: 8, color: stockBajo ? S.danger : S.text, fontSize: 15, fontWeight: 800, padding: "4px 2px", outline: "none" }} />
+                          ) : (
+                            <button onClick={() => setEditingProd({ id: p.id, field: 'stock', value: String(p.stock) })} title="Clic para editar stock" style={{
                               width: 52, padding: "6px 4px", borderRadius: 8, border: `2px solid ${stockBajo ? S.danger : S.border}`,
                               background: S.bg, color: stockBajo ? S.danger : S.text, fontSize: 15, fontWeight: 800, textAlign: "center",
                               cursor: "pointer",
                             }}>{p.stock}</button>
+                          )}
                           <button onClick={async () => { const ns = p.stock + 1; setProductos(prev => prev.map(x => x.id === p.id ? { ...x, stock: ns } : x)); await apiFetch(`/productos/${p.id}`, { method: 'PUT', body: { nombre: p.nombre, precio: p.precio, stock: ns, cat_id: p.cat_id, cocina: p.cocina } }); }} style={{
                             width: 32, height: 32, borderRadius: 8, border: `1px solid ${S.border}`, background: S.bg,
                             color: S.success, fontSize: 16, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
@@ -2536,10 +2742,14 @@ window.__App = function CantinaFull() {
                 {/* Arqueo de caja */}
                 <div style={{ padding: "14px 16px", borderRadius: 12, background: S.bg, border: `1px solid ${S.border}`, marginBottom: 16 }}>
                   <div style={{ fontSize: 11, fontWeight: 800, color: S.muted, letterSpacing: "0.04em", marginBottom: 8 }}>💰 ARQUEO DE CAJA — ¿Cuánto efectivo hay?</div>
-                  <button onClick={() => setTouchNum({ field: "arqueo", title: "EFECTIVO EN CAJA", value: arqueoEfectivo, prefix: "$", maxLen: 8 })}
-                    style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `2px solid ${S.border}`, background: S.surface, color: arqueoEfectivo ? S.text : S.muted, fontSize: 16, fontWeight: 800, textAlign: "left", cursor: "pointer" }}>
-                    {arqueoEfectivo ? "$" + Number(arqueoEfectivo).toLocaleString() : "Tocar para contar efectivo"}
-                  </button>
+                  <input
+                    type="number"
+                    min="0"
+                    value={arqueoEfectivo}
+                    onChange={e => setArqueoEfectivo(e.target.value.replace(/\D/g, ''))}
+                    placeholder="$0 — ingresá el efectivo contado"
+                    style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `2px solid ${arqueoEfectivo ? S.accent : S.border}`, background: S.surface, color: S.text, fontSize: 16, fontWeight: 800, outline: "none", fontFamily: "'DM Sans', sans-serif" }}
+                  />
                   {arqueoEfectivo.length > 0 && (() => {
                     const real = Number(arqueoEfectivo);
                     const diff = real - cierreCaja.efectivo;
@@ -3085,10 +3295,11 @@ window.__App = function CantinaFull() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <div>
                   <div style={{ fontSize: 10, fontWeight: 700, color: S.muted, marginBottom: 4 }}>Nombre</div>
-                  <button onClick={() => setTouchKb({ field: "userForm_nombre", title: "NOMBRE DEL USUARIO", value: userForm.nombre })}
-                    style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `2px solid ${userForm.nombre ? S.accent : S.border}`, background: S.bg, color: userForm.nombre ? S.text : S.muted, fontSize: 13, textAlign: "left", cursor: "pointer" }}>
-                    {userForm.nombre || "Tocar para escribir"}
-                  </button>
+                  <input type="text" autoFocus value={userForm.nombre}
+                    onChange={e => setUserForm(prev => prev ? ({...prev, nombre: e.target.value}) : null)}
+                    onKeyDown={e => { if (e.key === 'Escape') setUserForm(null); }}
+                    placeholder="Nombre del usuario"
+                    style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `2px solid ${userForm.nombre ? S.accent : S.border}`, background: S.bg, color: S.text, fontSize: 13, outline: "none", fontFamily: "'DM Sans', sans-serif" }} />
                 </div>
                 <div>
                   <div style={{ fontSize: 10, fontWeight: 700, color: S.muted, marginBottom: 4 }}>Rol</div>
@@ -3714,6 +3925,7 @@ function CobrarModal({ pedido, onCobrar, onClose, clientes, S }) {
   const [clienteSelec, setClienteSelec] = useState(null);
   const [showClienteList, setShowClienteList] = useState(false);
   const [descPct, setDescPct] = useState("");
+  const montoInputRef = useRef(null);
 
   const descMonto = descPct ? Math.round(pedido.total * Number(descPct) / 100) : 0;
   const totalFinal = pedido.total - descMonto;
@@ -3724,6 +3936,29 @@ function CobrarModal({ pedido, onCobrar, onClose, clientes, S }) {
     if (metodo === "cuenta_corriente") return clienteSelec !== null;
     return true;
   };
+
+  // Keyboard shortcuts: Escape closes, Enter confirms
+  useEffect(() => {
+    const confirmar = async () => {
+      if (!puedeConfirmar()) return;
+      try { await onCobrar(pedido.id, metodo, Number(montoRecibido), referencia, clienteSelec?.id || null); } catch(e) {}
+    };
+    const h = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); onClose(); }
+      else if (e.key === 'Enter') {
+        const activeEl = document.activeElement;
+        const isInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+        if (!isInput) { e.preventDefault(); confirmar(); }
+      }
+    };
+    document.addEventListener('keydown', h);
+    return () => document.removeEventListener('keydown', h);
+  }, [metodo, montoRecibido, referencia, clienteSelec, totalFinal, onClose, onCobrar, pedido.id]);
+
+  // Auto-focus monto input when method is efectivo
+  useEffect(() => {
+    if (metodo === 'efectivo') setTimeout(() => montoInputRef.current?.focus(), 50);
+  }, [metodo]);
 
   const clientesFiltrados = clienteBusq.length > 0
     ? clientes.filter(c => {
@@ -3810,8 +4045,12 @@ function CobrarModal({ pedido, onCobrar, onClose, clientes, S }) {
               <div style={{ position: "relative" }}>
                 <input type="text" value={clienteBusq} onChange={e => { setClienteBusq(e.target.value); setShowClienteList(true); }}
                   onFocus={() => setShowClienteList(true)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && clientesFiltrados.length > 0) { setClienteSelec(clientesFiltrados[0]); setShowClienteList(false); setClienteBusq(""); }
+                    if (e.key === 'Escape') { setShowClienteList(false); setClienteBusq(""); }
+                  }}
                   placeholder="🔍 Buscá por nombre, apodo o división..."
-                  style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `2px solid ${clienteBusq ? S.accent : S.border}`, background: S.bg, color: S.text, fontSize: 13, fontWeight: 600 }} />
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `2px solid ${clienteBusq ? S.accent : S.border}`, background: S.bg, color: S.text, fontSize: 13, fontWeight: 600, outline: "none" }} />
                 {clienteBusq && (
                   <button onClick={() => { setClienteBusq(""); setShowClienteList(false); }} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", border: "none", background: "transparent", color: S.muted, fontSize: 14, cursor: "pointer" }}>✕</button>
                 )}
@@ -3863,9 +4102,19 @@ function CobrarModal({ pedido, onCobrar, onClose, clientes, S }) {
             <div style={{ display: "flex", gap: 8, marginBottom: 6, alignItems: "flex-end" }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 10, fontWeight: 800, color: S.muted, marginBottom: 4 }}>RECIBIDO</div>
-                <div style={{ padding: "8px 10px", borderRadius: 10, border: `2px solid ${S.border}`, background: S.bg, textAlign: "center" }}>
-                  <span style={{ fontSize: 24, fontWeight: 900, color: montoRecibido ? S.text : S.muted }}>${montoRecibido ? Number(montoRecibido).toLocaleString() : "0"}</span>
-                </div>
+                <input
+                  ref={montoInputRef}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={montoRecibido}
+                  onChange={e => setMontoRecibido(e.target.value.replace(/\D/g, ''))}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { e.preventDefault(); if (puedeConfirmar()) onCobrar(pedido.id, metodo, Number(montoRecibido), referencia, clienteSelec?.id || null).catch(()=>{}); }
+                  }}
+                  placeholder="0"
+                  style={{ width: "100%", padding: "8px 10px", borderRadius: 10, border: `2px solid ${montoRecibido ? S.accent : S.border}`, background: S.bg, fontSize: 28, fontWeight: 900, textAlign: "center", color: montoRecibido ? S.text : S.muted, outline: "none", fontFamily: "'JetBrains Mono', monospace" }}
+                />
               </div>
               {vuelto !== null && vuelto >= 0 && (
                 <div style={{ flex: 1 }}>
@@ -3876,12 +4125,13 @@ function CobrarModal({ pedido, onCobrar, onClose, clientes, S }) {
                 </div>
               )}
             </div>
-            {/* Inline numpad */}
+            {/* Inline numpad (touch) */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 5, marginBottom: 6 }}>
               {["1","2","3","C","4","5","6","0","7","8","9","00"].map(k => (
                 <button key={k} onClick={() => {
                   if (k === "C") setMontoRecibido("");
                   else setMontoRecibido(prev => prev + k);
+                  montoInputRef.current?.focus();
                 }} style={{ height: 40, borderRadius: 8, border: `1px solid ${S.border}`, background: k === "C" ? S.border : S.bg, color: S.text, fontSize: k === "C" ? 13 : 16, fontWeight: 800, cursor: "pointer" }}>{k === "C" ? "✕" : k}</button>
               ))}
             </div>
@@ -3906,9 +4156,16 @@ function CobrarModal({ pedido, onCobrar, onClose, clientes, S }) {
             </div>
             <div style={{ fontSize: 11, fontWeight: 800, color: S.muted, marginBottom: 6 }}>Últimos 4 dígitos (opcional)</div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <div style={{ flex: 1, padding: "10px 14px", borderRadius: 10, border: `2px solid ${S.border}`, background: S.bg, fontSize: 22, fontWeight: 800, color: S.text, textAlign: "center", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.2em" }}>
-                {referencia || "_ _ _ _"}
-              </div>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={4}
+                value={referencia}
+                onChange={e => setReferencia(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (puedeConfirmar()) onCobrar(pedido.id, metodo, Number(montoRecibido), referencia, clienteSelec?.id || null).catch(()=>{}); } }}
+                placeholder="_ _ _ _"
+                style={{ flex: 1, padding: "10px 14px", borderRadius: 10, border: `2px solid ${referencia ? S.accent : S.border}`, background: S.bg, fontSize: 22, fontWeight: 800, color: S.text, textAlign: "center", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.2em", outline: "none" }}
+              />
               {referencia && <button onClick={() => setReferencia("")} style={{ padding: "8px 12px", borderRadius: 8, border: "none", background: S.border, color: S.text, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>✕</button>}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 5 }}>
