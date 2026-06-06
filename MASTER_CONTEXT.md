@@ -7,7 +7,7 @@ Incluye: impresora térmica para tickets, TV en el salón con carrusel de imáge
 
 ---
 
-## Estado actual del sistema (mayo 2026)
+## Estado actual del sistema (junio 2026)
 
 El sistema está **en producción, estable y documentado**. Todos los servicios levantan solos tras un reboot. No hay reescrituras pendientes — se trabaja en mejoras incrementales.
 
@@ -23,6 +23,12 @@ El sistema está **en producción, estable y documentado**. Todos los servicios 
 - Backups con retención de 30 días; scripts de mantenimiento completos
 - Documentación completa: ARCHITECTURE, DEPLOYMENT, RECOVERY, OPERACION, SERVER_INFO, MASTER_CONTEXT
 - Código demo eliminado (botón "Simular pedido autoservicio" removido)
+- **Pantalla Caja con 3 solapas:** Hoy (cierre normal) · Historial (últimos 30 cierres con Ver/Descargar) · Estadísticas (gráfico torta, rankings, métricas, selector de rango)
+- **Productos sin stock:** permanecen activos y clickeables; stock puede ser negativo; badge "SIN STOCK" en la card
+- **Validación cantidad:** `POST /api/pedidos` rechaza `cantidad ≤ 0` o no entero — evita pedidos inválidos
+- **Descuento real en cobro:** `POST /api/pedidos/:id/cobrar` calcula y persiste el `total` post-descuento; la cuenta corriente incrementa el monto real cobrado (no el bruto)
+- **Cierre de caja persistente:** `CierreCaja.details` (JSON) guarda los productos vendidos para consulta futura desde Historial
+- **Nuevas rutas:** `GET /api/cierres/:id`, `GET /api/estadisticas?range=...`, `GET /api/pedidos/por-fecha?fecha=...`
 
 ### Pendiente (requiere acceso físico)
 
@@ -68,8 +74,8 @@ El sistema está **en producción, estable y documentado**. Todos los servicios 
 
 | Archivo | Descripción |
 |---|---|
-| `server.js` | Backend completo (~660 líneas, un solo archivo) |
-| `client/dist/index.html` | POS principal (~3600 líneas, React inline) |
+| `server.js` | Backend completo (~780 líneas, un solo archivo) |
+| `client/dist/index.html` | POS principal (~4500 líneas, React inline) |
 | `client/dist/cocina.html` | Vista cocina |
 | `client/dist/autoservicio.html` | Tablet autoservicio |
 | `client/dist/promo.html` | TV carrusel de promociones (fullscreen, polling 30s) |
@@ -93,6 +99,18 @@ El sistema está **en producción, estable y documentado**. Todos los servicios 
 - `POST /api/system/backup` — genera backup de la DB
 - `POST /api/system/clear-cache` — libera caché RAM
 
+**Pedidos**
+- `GET /api/pedidos` — pedidos de hoy
+- `GET /api/pedidos/por-fecha?fecha=YYYY-MM-DD` — pedidos cobrados de una fecha específica
+- `POST /api/pedidos` — crea pedido (valida `cantidad > 0` entero)
+- `POST /api/pedidos/:id/cobrar` — cobra pedido; aplica `descuento_pct` al total y lo persiste; `cuenta_corriente` usa el monto real
+
+**Cierre de caja y estadísticas**
+- `POST /api/cierres` — registra cierre; acepta `details` JSON con productos vendidos
+- `GET /api/cierres` — últimos 30 cierres
+- `GET /api/cierres/:id` — cierre individual
+- `GET /api/estadisticas?range=today|week|month|lastmonth|all` — ventas por producto, ticket promedio, hora pico
+
 **Carrusel TV**
 - `GET /api/carousel` — lista imágenes activas (usada por promo.html y el POS)
 - `POST /api/carousel` — sube imagen (base64 JSON), guarda en `/images/` y en DB
@@ -109,12 +127,12 @@ El sistema está **en producción, estable y documentado**. Todos los servicios 
 ```
 Usuario        → login por PIN, roles (caja, cocina, admin)
 Categoria      → agrupa productos, flag despacho_directo
-Producto       → precio, stock, stock_min, código de barras
+Producto       → precio, stock (puede ser negativo), stock_min, código de barras
 Cliente        → cuenta corriente (fiado)
 ClientePago    → historial de pagos
-Pedido         → tipo mesa/barra, estado, cobrado, método de pago
+Pedido         → tipo mesa/barra, estado, cobrado, método de pago, descuento_pct, total (post-descuento)
 PedidoItem     → líneas del pedido con precio capturado
-CierreCaja     → resumen de cierre diario
+CierreCaja     → resumen de cierre diario + details JSON (desglose de productos vendidos)
 CarouselImage  → imágenes para el TV (filename, orden, activo)
 ```
 

@@ -109,6 +109,7 @@ model CierreCaja {
   cantPedidos   Int
   arqueo        Float?
   diferencia    Float?
+  details       Json?
   fecha         DateTime @default(now())
 }
 

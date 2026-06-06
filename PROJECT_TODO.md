@@ -1,5 +1,19 @@
 # TODO Proyecto Cantina POS
 
+## UX / Features recientes (junio 2026)
+
+* [x] Pantalla Caja: 3 solapas — Hoy / Historial / Estadísticas
+* [x] Historial cierres: Ver muestra productos vendidos (usa details JSON o fallback por fecha)
+* [x] Historial cierres: Descargar genera .txt con resumen completo
+* [x] Estadísticas: gráfico torta + rankings por cantidad/monto + métricas resumen + selector de rango
+* [x] Actualización instantánea de Historial y Estadísticas al hacer cierre
+* [x] CierreCaja.details: persiste desglose completo de productos en el cierre
+* [x] Nuevas rutas: GET /api/cierres/:id, GET /api/estadisticas, GET /api/pedidos/por-fecha
+* [x] Sin stock: productos permanecen activos, stock negativo permitido, badge "SIN STOCK" en card
+* [x] Validación crítica: POST /api/pedidos rechaza cantidad ≤ 0 o no entero — evita stock corrupto
+* [x] Descuento real: POST /api/pedidos/:id/cobrar aplica descuento_pct al total y lo persiste en DB; cuenta corriente usa monto post-descuento
+* [x] Botón ticket renombrado a "🧾 Ver ticket" en lista de pedidos
+
 ## UX / Features recientes (mayo 2026)
 
 * [x] Modal cobrar: compactar padding/spacing para que entre sin scroll en pantallas tablet

@@ -112,21 +112,24 @@ Un solo archivo Node.js con Express. Usa Prisma como ORM sobre PostgreSQL.
 | POST   | /api/clientes/:id/pago  | Registra pago y descuenta saldo  |
 
 **Pedidos**
-| Método | Ruta                       | Descripción                             |
-|--------|----------------------------|-----------------------------------------|
-| GET    | /api/pedidos               | Pedidos de hoy                          |
-| GET    | /api/pedidos/all           | Últimos 200 pedidos                     |
-| POST   | /api/pedidos               | Crea pedido, descuenta stock, emite WS  |
-| PUT    | /api/pedidos/:id           | Actualiza pedido, emite WS              |
-| POST   | /api/pedidos/:id/cobrar    | Marca cobrado, gestiona cuenta corriente|
-| POST   | /api/pedidos/:id/cancelar  | Cancela y restaura stock, emite WS      |
-| GET    | /api/pedidos/:id/ticket    | Genera texto de ticket para impresora   |
+| Método | Ruta                           | Descripción                                          |
+|--------|--------------------------------|------------------------------------------------------|
+| GET    | /api/pedidos                   | Pedidos de hoy                                       |
+| GET    | /api/pedidos/all               | Últimos 200 pedidos                                  |
+| GET    | /api/pedidos/por-fecha         | Pedidos cobrados de una fecha (`?fecha=YYYY-MM-DD`)  |
+| POST   | /api/pedidos                   | Crea pedido, valida cantidad > 0, descuenta stock    |
+| PUT    | /api/pedidos/:id               | Actualiza pedido, emite WS                           |
+| POST   | /api/pedidos/:id/cobrar        | Marca cobrado, aplica descuento real al total, gestiona cuenta corriente |
+| POST   | /api/pedidos/:id/cancelar      | Cancela y restaura stock, emite WS                   |
+| GET    | /api/pedidos/:id/ticket        | Genera texto de ticket para impresora                |
 
-**Cierre de caja**
-| Método | Ruta         | Descripción                    |
-|--------|--------------|--------------------------------|
-| POST   | /api/cierres | Registra cierre de caja        |
-| GET    | /api/cierres | Últimos 30 cierres             |
+**Cierre de caja y estadísticas**
+| Método | Ruta                      | Descripción                                                      |
+|--------|---------------------------|------------------------------------------------------------------|
+| POST   | /api/cierres              | Registra cierre de caja (persiste `details` JSON con productos)  |
+| GET    | /api/cierres              | Últimos 30 cierres                                               |
+| GET    | /api/cierres/:id          | Cierre individual por ID                                         |
+| GET    | /api/estadisticas         | Estadísticas de ventas (`?range=today\|week\|month\|lastmonth\|all`) |
 
 **Autoservicio**
 | Método | Ruta                          | Descripción                            |
@@ -167,9 +170,9 @@ Categoria       → agrupa productos, puede tener despacho_directo
 Producto        → precio, stock, stock_min, código de barras opcional
 Cliente         → nombre, apodo, división, saldo cuenta corriente
 ClientePago     → historial de pagos de clientes
-Pedido          → tipo (mesa/barra), estado, cobrado, método de pago
+Pedido          → tipo (mesa/barra), estado, cobrado, método de pago, descuento_pct, total (post-descuento)
 PedidoItem      → líneas del pedido con precio capturado al momento
-CierreCaja      → resumen de cierre con efectivo/transferencia/fiado
+CierreCaja      → resumen de cierre con efectivo/transferencia/fiado + details JSON (productos vendidos)
 CarouselImage   → imágenes para el carrusel de la pantalla de TV
 ```
 
@@ -200,6 +203,16 @@ Página sin UI (fullscreen, sin cursor) diseñada para correr en el TV del saló
 - Los archivos se guardan en `/home/cantina/cantina-pos/images/`
 
 El frontend usa React con Babel en el browser (sin build step en producción). Las dependencias (React, ReactDOM, Babel, Chart.js, fuentes) están en `/vendor/` y `/fonts/` — **sin dependencias de internet**.
+
+### Pantalla Caja — solapas
+
+La pestaña Caja tiene tres sub-solapas:
+
+- **Hoy** — flujo normal de cierre: resumen efectivo/transferencia/fiado, arqueo, botón "Confirmar y guardar"
+- **Historial** — últimos 30 cierres. Botón **Ver** muestra productos vendidos ese día (usa `details` JSON del cierre o, para cierres antiguos, consulta `/api/pedidos/por-fecha`). Botón **Descargar** genera un `.txt` con el resumen completo.
+- **Estadísticas** — ventas por rango (Hoy / Semana / Mes / Mes anterior / Todo): gráfico de torta por producto, ranking por cantidad y por monto, métricas resumen (total, ticket promedio, hora pico, pedidos).
+
+Al confirmar un cierre, Historial y Estadísticas se actualizan al instante sin recargar.
 
 ### Sistema de temas (Modern POS v2)
 

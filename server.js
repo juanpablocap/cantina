@@ -343,12 +343,32 @@ app.get('/api/pedidos/all', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Pedidos cobrados de un día específico (para reconstruir detalle de cierres sin details guardados)
+app.get('/api/pedidos/por-fecha', async (req, res) => {
+  try {
+    const { fecha } = req.query; // YYYY-MM-DD
+    if (!fecha) return res.status(400).json({ error: 'fecha requerida' });
+    const desde = new Date(fecha);
+    desde.setHours(0, 0, 0, 0);
+    const hasta = new Date(fecha);
+    hasta.setHours(23, 59, 59, 999);
+    const pedidos = await prisma.pedido.findMany({
+      where: { cobrado: true, estado: { not: 'cancelado' }, createdAt: { gte: desde, lte: hasta } },
+      include: { items: { include: { producto: true } }, cliente: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    res.json(pedidos);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/pedidos', async (req, res) => {
   try {
     const { tipo, mesa_numero, nombre_cliente, total, items } = req.body;
     if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'items requeridos' });
     if (!['mesa', 'barra'].includes(tipo)) return res.status(400).json({ error: 'tipo inválido' });
     if (!total || total <= 0) return res.status(400).json({ error: 'total inválido' });
+    if (items.some(i => !Number.isInteger(i.cantidad) || i.cantidad <= 0))
+      return res.status(400).json({ error: 'cantidad inválida' });
 
     const pedido = await prisma.$transaction(async (tx) => {
       const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -463,7 +483,10 @@ app.post('/api/pedidos/:id/cobrar', async (req, res) => {
       if (!existing) throw Object.assign(new Error('Pedido no encontrado'), { status: 404 });
       if (existing.cobrado) throw Object.assign(new Error('Pedido ya cobrado'), { status: 409 });
 
-      const data = { cobrado: true, metodo_pago, estado: 'entregado' };
+      const totalConDescuento = descuento_pct
+        ? Math.round(existing.total * (1 - descuento_pct / 100))
+        : existing.total;
+      const data = { cobrado: true, metodo_pago, estado: 'entregado', total: totalConDescuento };
       if (referencia) data.referencia = referencia;
       if (descuento_pct) data.descuento_pct = descuento_pct;
       if (cliente_id) data.cliente_id = cliente_id;
@@ -474,7 +497,7 @@ app.post('/api/pedidos/:id/cobrar', async (req, res) => {
         include: { items: { include: { producto: true } } }
       });
       if (metodo_pago === 'cuenta_corriente' && cliente_id) {
-        await tx.cliente.update({ where: { id: cliente_id }, data: { saldo: { increment: pedido.total } } });
+        await tx.cliente.update({ where: { id: cliente_id }, data: { saldo: { increment: totalConDescuento } } });
       }
       return pedido;
     });
@@ -519,6 +542,86 @@ app.get('/api/cierres', async (req, res) => {
   try {
     const cierres = await prisma.cierreCaja.findMany({ orderBy: { fecha: 'desc' }, take: 30 });
     res.json(cierres);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/cierres/:id', async (req, res) => {
+  try {
+    const cierre = await prisma.cierreCaja.findUnique({ where: { id: Number(req.params.id) } });
+    if (!cierre) return res.status(404).json({ error: 'No encontrado' });
+    res.json(cierre);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============================================
+// ESTADÍSTICAS — ventas por producto con rango de fechas
+// ============================================
+app.get('/api/estadisticas', async (req, res) => {
+  try {
+    const range = req.query.range || 'today';
+    const now = new Date();
+    let since, until = null;
+
+    if (range === 'week') {
+      since = new Date(now); since.setDate(since.getDate() - 6); since.setHours(0, 0, 0, 0);
+    } else if (range === 'month') {
+      since = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else if (range === 'lastmonth') {
+      since = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      until = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else if (range === 'all') {
+      since = new Date(0);
+    } else {
+      since = new Date(now); since.setHours(0, 0, 0, 0);
+    }
+
+    const dateFilter = { gte: since };
+    if (until) dateFilter.lt = until;
+
+    const pedidos = await prisma.pedido.findMany({
+      where: { cobrado: true, estado: { not: 'cancelado' }, createdAt: dateFilter },
+      include: { items: { include: { producto: true } } },
+    });
+
+    // Aggregate sales by product
+    const prodMap = {};
+    pedidos.forEach(p => {
+      p.items.forEach(item => {
+        const nombre = item.producto?.nombre || `Producto #${item.producto_id}`;
+        const id = item.producto_id;
+        if (!prodMap[id]) prodMap[id] = { id, nombre, cantidad: 0, total: 0 };
+        prodMap[id].cantidad += item.cantidad;
+        prodMap[id].total += item.precio * item.cantidad;
+      });
+    });
+
+    const totalVentas = pedidos.reduce((s, p) => s + p.total, 0);
+    const totalCantidad = Object.values(prodMap).reduce((s, p) => s + p.cantidad, 0);
+
+    const productos = Object.values(prodMap).sort((a, b) => b.cantidad - a.cantidad);
+    productos.forEach(p => {
+      p.pctCantidad = totalCantidad > 0 ? Math.round(p.cantidad / totalCantidad * 1000) / 10 : 0;
+      p.pctTotal = totalVentas > 0 ? Math.round(p.total / totalVentas * 1000) / 10 : 0;
+    });
+
+    // Find peak hour
+    const horaCounts = {};
+    pedidos.forEach(p => {
+      const h = new Date(p.createdAt).getHours();
+      horaCounts[h] = (horaCounts[h] || 0) + 1;
+    });
+    const horaEntries = Object.entries(horaCounts);
+    const horarioPico = horaEntries.length > 0
+      ? horaEntries.reduce((best, [h, c]) => Number(c) > best.cantidad ? { hora: Number(h), cantidad: Number(c) } : best, { hora: 0, cantidad: 0 })
+      : null;
+
+    res.json({
+      productos,
+      pedidosCount: pedidos.length,
+      ticketPromedio: pedidos.length > 0 ? Math.round(totalVentas / pedidos.length) : 0,
+      horarioPico,
+      totalVentas,
+    });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 

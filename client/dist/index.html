@@ -151,6 +151,58 @@ function SysChart({ data, color, maxY, label, unit, current }) {
   );
 }
 
+// PIE CHART — donut chart usando Chart.js para estadísticas
+// ========================================
+const PIE_COLORS = ['#6366F1','#EC4899','#F59E0B','#10B981','#3B82F6','#8B5CF6','#EF4444','#06B6D4'];
+
+function PieChart({ labels, data, colors }) {
+  const canvasRef = useRef(null);
+  const chartRef  = useRef(null);
+
+  useEffect(() => {
+    if (!canvasRef.current || typeof Chart === 'undefined') return;
+    if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; }
+    chartRef.current = new Chart(canvasRef.current, {
+      type: 'doughnut',
+      data: {
+        labels,
+        datasets: [{ data, backgroundColor: colors, borderWidth: 2, borderColor: '#07080F', hoverOffset: 6 }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                const pct = total > 0 ? Math.round(ctx.parsed / total * 100) : 0;
+                return ` ${ctx.label}: ${ctx.parsed} uds. (${pct}%)`;
+              }
+            }
+          }
+        },
+        cutout: '55%',
+      },
+    });
+    return () => { if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; } };
+  }, []);
+
+  useEffect(() => {
+    if (!chartRef.current) return;
+    chartRef.current.data.labels = labels;
+    chartRef.current.data.datasets[0].data = data;
+    chartRef.current.data.datasets[0].backgroundColor = colors;
+    chartRef.current.update();
+  }, [labels, data, colors]);
+
+  return (
+    React.createElement('div', { style: { position: 'relative', width: '100%', height: '100%' } },
+      React.createElement('canvas', { ref: canvasRef })
+    )
+  );
+}
+
 // TOUCH KEYBOARD MODAL
 // ========================================
 const KB_ROWS_UPPER = [["1","2","3","4","5","6","7","8","9","0"],["Q","W","E","R","T","Y","U","I","O","P"],["A","S","D","F","G","H","J","K","L","Ñ"],["⇧","Z","X","C","V","B","N","M","⌫"]];
@@ -369,6 +421,11 @@ window.__App = function CantinaFull() {
   const [editingCartItem, setEditingCartItem] = useState(null); // { producto_id, field: 'qty'|'precio', value }
   const [editingProd, setEditingProd] = useState(null); // { id, field: 'stock'|'precio', value }
   const [mesaKeyInput, setMesaKeyInput] = useState("");
+  const [cajaTab, setCajaTab] = useState("hoy");
+  const [estadRango, setEstadRango] = useState("hoy");
+  const [estadData, setEstadData] = useState(null);
+  const [estadLoading, setEstadLoading] = useState(false);
+  const [estadRefreshKey, setEstadRefreshKey] = useState(0);
 
   // Load data from API on login
   useEffect(() => {
@@ -473,6 +530,15 @@ window.__App = function CantinaFull() {
     const iv = setInterval(fetchSys, 5000);
     return () => clearInterval(iv);
   }, [loggedIn, dataLoaded]);
+
+  // Cargar estadísticas cuando se abre la solapa o cambia el rango
+  useEffect(() => {
+    if (!loggedIn || cajaTab !== "estadisticas") return;
+    const rangoParam = { hoy: "today", semana: "week", mes: "month", lastmonth: "lastmonth", all: "all" }[estadRango] || "today";
+    setEstadLoading(true);
+    setEstadData(null);
+    apiFetch(`/estadisticas?range=${rangoParam}`).then(d => { setEstadData(d); setEstadLoading(false); });
+  }, [loggedIn, cajaTab, estadRango, estadRefreshKey]);
 
   // === GLOBAL KEYBOARD SHORTCUTS ===
   useEffect(() => {
@@ -583,7 +649,6 @@ window.__App = function CantinaFull() {
     setCarrito(prev => {
       const ex = prev.find(i => i.producto_id === prod.id);
       if (ex) {
-        if (ex.cantidad >= prod.stock) return prev;
         return prev.map(i => i.producto_id === prod.id ? { ...i, cantidad: i.cantidad + 1 } : i);
       }
       const cat = prod.categoria || { despacho_directo: false };
@@ -780,7 +845,7 @@ window.__App = function CantinaFull() {
   };
 
   // Cobrar pedido
-  const cobrarPedido = async (pedidoId, metodo, montoRecibido, referencia, clienteId) => {
+  const cobrarPedido = async (pedidoId, metodo, montoRecibido, referencia, clienteId, descPct) => {
     // Handle consolidated mesa cobro (multiple pedidos)
     const pedidosACobrar = [];
     const pedOriginal = pedidos.find(p => p.id === pedidoId);
@@ -798,6 +863,7 @@ window.__App = function CantinaFull() {
       const body = { metodo_pago: metodo };
       if (referencia) body.referencia = referencia;
       if (clienteId) body.cliente_id = clienteId;
+      if (descPct) body.descuento_pct = Number(descPct);
       
       const result = await apiFetch(`/pedidos/${pid}/cobrar`, { method: 'POST', body });
       if (!result) allOk = false;
@@ -1133,33 +1199,33 @@ window.__App = function CantinaFull() {
           if (theme !== 'classic') {
             const isTablet = theme === 'tablet';
             return (
-              <button key={p.id} onClick={() => !sinStock && agregarItem(p)}
+              <button key={p.id} onClick={() => agregarItem(p)}
                 className={stockBajo ? "stock-low" : ""}
                 style={{
-                  position: "relative", borderRadius: 16, border: `2px solid ${enCarrito ? cat.color : sinStock ? S.danger + "30" : S.border}`,
-                  background: enCarrito ? cat.color + "20" : sinStock ? S.danger + "08" : S.surface,
-                  textAlign: "left", cursor: sinStock ? "not-allowed" : "pointer", opacity: sinStock ? 0.5 : 1,
+                  position: "relative", borderRadius: 16, border: `2px solid ${enCarrito ? cat.color : S.border}`,
+                  background: enCarrito ? cat.color + "20" : S.surface,
+                  textAlign: "left", cursor: "pointer",
                   transition: "all 0.12s", overflow: "hidden", display: "flex", flexDirection: "column",
                   boxShadow: enCarrito ? `0 0 0 0 transparent, 0 4px 16px rgba(0,0,0,0.3)` : `0 2px 8px rgba(0,0,0,0.2)`,
                 }}>
                 {/* Category color band */}
                 <div style={{ height: 5, background: enCarrito ? cat.color : cat.color + "60", flexShrink: 0 }} />
                 <div style={{ padding: "14px 14px 12px", flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
-                  {sinStock && (
-                    <div style={{ position: "absolute", top: "50%", left: -10, right: -10, height: 5, background: S.danger, transform: "rotate(-8deg)", opacity: 0.6 }} />
-                  )}
                   {enCarrito && (
                     <div style={{ position: "absolute", top: 12, right: 10, width: 28, height: 28, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 900, color: "#fff", background: cat.color, boxShadow: `0 2px 8px ${cat.color}80` }}>
                       {enCarrito.cantidad}
                     </div>
                   )}
-                  {stockBajo && (
+                  {sinStock && (
+                    <span style={{ position: "absolute", top: 12, left: 10, fontSize: isTablet ? 13 : 9, fontWeight: 900, color: S.danger, background: S.danger + "25", padding: isTablet ? "3px 8px" : "2px 6px", borderRadius: 6, letterSpacing: "0.05em" }}>SIN STOCK</span>
+                  )}
+                  {stockBajo && !sinStock && (
                     <span style={{ position: "absolute", top: 12, left: 10, fontSize: isTablet ? 13 : 9, fontWeight: 900, color: S.danger, background: S.danger + "25", padding: isTablet ? "3px 8px" : "2px 6px", borderRadius: 6, letterSpacing: "0.05em" }}>POCO</span>
                   )}
-                  <div style={{ fontSize: 16, fontWeight: isTablet ? 500 : 700, lineHeight: 1.25, color: sinStock ? S.muted : isTablet ? "#E2E6F0" : S.text, textDecoration: sinStock ? "line-through" : "none", paddingRight: enCarrito ? 30 : 0 }}>{p.nombre}</div>
+                  <div style={{ fontSize: 16, fontWeight: isTablet ? 500 : 700, lineHeight: 1.25, color: isTablet ? "#E2E6F0" : S.text, paddingRight: enCarrito ? 30 : 0 }}>{p.nombre}</div>
                   <div style={{ fontSize: isTablet ? 18 : 19, fontWeight: isTablet ? 700 : 900, color: isTablet ? S.accent : (enCarrito ? cat.color : S.text), letterSpacing: "-0.01em" }}>${p.precio.toLocaleString()}</div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "auto" }}>
-                    <span style={{ fontSize: isTablet ? 12 : 11, color: stockBajo ? S.danger : S.muted, fontWeight: stockBajo ? 700 : 400 }}>Stock {p.stock}</span>
+                    <span style={{ fontSize: isTablet ? 12 : 11, color: sinStock ? S.danger : stockBajo ? S.danger : S.muted, fontWeight: sinStock || stockBajo ? 700 : 400 }}>{sinStock ? "¡Sin stock!" : `Stock ${p.stock}`}</span>
                     {cat.despacho_directo && !p.cocina && <span style={{ fontSize: isTablet ? 13 : 9, fontWeight: 900, color: S.success, background: S.success + "20", padding: isTablet ? "3px 8px" : "2px 6px", borderRadius: 5 }}>⚡</span>}
                     {p.cocina && <span style={{ fontSize: isTablet ? 13 : 9, fontWeight: 900, color: S.warning, background: S.warning + "20", padding: isTablet ? "3px 8px" : "2px 6px", borderRadius: 5 }}>🔥</span>}
                   </div>
@@ -1168,21 +1234,21 @@ window.__App = function CantinaFull() {
             );
           }
           return (
-            <button key={p.id} onClick={() => !sinStock && agregarItem(p)}
+            <button key={p.id} onClick={() => agregarItem(p)}
               className={stockBajo ? "stock-low" : ""}
               style={{
-                position: "relative", padding: 16, borderRadius: 14, border: `2px solid ${enCarrito ? cat.color : sinStock ? S.danger + "40" : S.border}`,
-                background: enCarrito ? cat.color + "18" : sinStock ? S.danger + "08" : S.surface,
-                textAlign: "left", cursor: sinStock ? "not-allowed" : "pointer", opacity: sinStock ? 0.5 : 1,
+                position: "relative", padding: 16, borderRadius: 14, border: `2px solid ${enCarrito ? cat.color : S.border}`,
+                background: enCarrito ? cat.color + "18" : S.surface,
+                textAlign: "left", cursor: "pointer",
                 transition: "all 0.1s", overflow: "hidden",
               }}>
-              {sinStock && <div style={{ position: "absolute", top: "50%", left: -10, right: -10, height: 6, background: S.danger, transform: "rotate(-12deg)", opacity: 0.7 }} />}
               {enCarrito && <span style={{ position: "absolute", top: 4, right: 4, width: 24, height: 24, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900, color: "#fff", background: cat.color, zIndex: 2 }}>{enCarrito.cantidad}</span>}
-              {stockBajo && <span style={{ position: "absolute", top: 4, left: 4, fontSize: 10, fontWeight: 900, color: S.danger, background: S.danger + "20", padding: "2px 6px", borderRadius: 6, zIndex: 2 }}>¡POCO!</span>}
-              <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.2, marginBottom: 6, color: S.text, textDecoration: sinStock ? "line-through" : "none", textDecorationColor: S.danger }}>{p.nombre}</div>
+              {sinStock && <span style={{ position: "absolute", top: 4, left: 4, fontSize: 10, fontWeight: 900, color: S.danger, background: S.danger + "20", padding: "2px 6px", borderRadius: 6, zIndex: 2 }}>SIN STOCK</span>}
+              {stockBajo && !sinStock && <span style={{ position: "absolute", top: 4, left: 4, fontSize: 10, fontWeight: 900, color: S.danger, background: S.danger + "20", padding: "2px 6px", borderRadius: 6, zIndex: 2 }}>¡POCO!</span>}
+              <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.2, marginBottom: 6, color: S.text }}>{p.nombre}</div>
               <div style={{ fontSize: 15, fontWeight: 900, color: cat.color }}>${p.precio.toLocaleString()}</div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
-                <span style={{ fontSize: 11, color: stockBajo ? S.danger : S.muted, fontWeight: stockBajo ? 800 : 400 }}>Stock: {p.stock}</span>
+                <span style={{ fontSize: 11, color: sinStock ? S.danger : stockBajo ? S.danger : S.muted, fontWeight: sinStock || stockBajo ? 800 : 400 }}>{sinStock ? "¡Sin stock!" : `Stock: ${p.stock}`}</span>
                 {cat.despacho_directo && !p.cocina && <span style={{ fontSize: 9, fontWeight: 900, color: S.success }}>DIRECTO</span>}
                 {p.cocina && <span style={{ fontSize: 9, fontWeight: 900, color: S.warning }}>COCINA</span>}
               </div>
@@ -1370,7 +1436,7 @@ window.__App = function CantinaFull() {
                   onChange={e => { setBusqueda(e.target.value); setCatActiva(null); }}
                   onKeyDown={e => {
                     if (e.key === 'Enter') {
-                      const first = productosFiltrados.find(p => p.stock > 0);
+                      const first = productosFiltrados[0];
                       if (first) { agregarItem(first); setBusqueda(""); busquedaRef.current?.blur(); }
                       e.preventDefault();
                     }
@@ -1916,7 +1982,7 @@ window.__App = function CantinaFull() {
                               <button onClick={() => setEditarPedido({ id: p.id, numero: p.numero, items: p.items.map(i => ({ ...i })) })} style={{ flex: 1, padding: "7px 0", borderRadius: 9, border: `1px solid ${S.border}`, background: S.surfaceHover, color: S.text, fontSize: 11, fontWeight: 800, cursor: "pointer" }}>✏️</button>
                             )}
                             {p.cobrado && p.estado !== "cancelado" && (
-                              <button onClick={() => setTicketVisible(p)} style={{ flex: 1, padding: "7px 0", borderRadius: 9, border: `1px solid ${S.border}`, background: S.surfaceHover, color: S.muted, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>🧾</button>
+                              <button onClick={() => setTicketVisible(p)} style={{ flex: 1, padding: "7px 0", borderRadius: 9, border: `1px solid ${S.border}`, background: S.surfaceHover, color: S.muted, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>🧾 Ver ticket</button>
                             )}
                           </div>
                         </div>
@@ -1988,7 +2054,7 @@ window.__App = function CantinaFull() {
                             <button onClick={() => setCobrandoPedido(p)} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: S.accent, color: "#fff", fontSize: 11, fontWeight: 800, cursor: "pointer" }}>💰 Cobrar</button>
                           )}
                           {p.cobrado && p.estado !== "cancelado" && (
-                            <button onClick={() => setTicketVisible(p)} style={{ padding: "6px 10px", borderRadius: 8, border: `1px solid ${S.border}`, background: S.bg, color: S.muted, fontSize: 10, fontWeight: 700, cursor: "pointer" }}>🧾</button>
+                            <button onClick={() => setTicketVisible(p)} style={{ padding: "6px 10px", borderRadius: 8, border: `1px solid ${S.border}`, background: S.bg, color: S.muted, fontSize: 10, fontWeight: 700, cursor: "pointer" }}>🧾 Ver ticket</button>
                           )}
                         </div>
                       </div>
@@ -2590,124 +2656,324 @@ window.__App = function CantinaFull() {
       )}
 
       {/* ========================================= */}
-      {/* TAB: CAJA */}
+      {/* TAB: CAJA — 3 solapas: Hoy / Historial / Estadísticas */}
       {/* ========================================= */}
       {tab === "caja" && (
-        <div style={{ flex: 1, overflow: "auto", padding: 24 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 800, color: S.muted, letterSpacing: "0.08em" }}>CAJA DEL DÍA</div>
-              <div style={{ fontSize: 13, color: S.muted, marginTop: 4 }}>{new Date().toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
-            </div>
-            <button onClick={hacerCierreCaja} style={{
-              padding: "12px 24px", borderRadius: 12, border: "none", background: S.accent, color: "#fff",
-              fontSize: 14, fontWeight: 800, cursor: "pointer",
-            }}>📊 Hacer Cierre de Caja</button>
-          </div>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
-          {/* Summary cards */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+          {/* Barra de sub-solapas */}
+          <div style={{ display: "flex", gap: 4, padding: "14px 24px 0", borderBottom: `1px solid ${S.border}`, flexShrink: 0, background: S.surface }}>
             {[
-              { label: "EFECTIVO", emoji: "💵", color: S.success, monto: cajaMovimientos.filter(m => m.metodo === "efectivo").reduce((s, m) => s + m.monto, 0) },
-              { label: "TRANSFERENCIAS", emoji: "📱", color: S.info, monto: cajaMovimientos.filter(m => m.metodo === "transferencia").reduce((s, m) => s + m.monto, 0) },
-              { label: "FIADO", emoji: "📋", color: S.warning, monto: cajaMovimientos.filter(m => m.metodo === "cuenta_corriente").reduce((s, m) => s + m.monto, 0) },
-              { label: "TOTAL DEL DÍA", emoji: "💰", color: S.accent, monto: cajaMovimientos.reduce((s, m) => s + m.monto, 0) },
-            ].map((c, i) => (
-              <div key={i} style={{ padding: 20, borderRadius: 16, background: S.surface, border: `2px solid ${c.color}30`, textAlign: "center" }}>
-                <div style={{ fontSize: 28, marginBottom: 8 }}>{c.emoji}</div>
-                <div style={{ fontSize: 10, fontWeight: 800, color: S.muted, letterSpacing: "0.06em", marginBottom: 6 }}>{c.label}</div>
-                <div style={{ fontSize: 28, fontWeight: 900, color: c.color }}>${c.monto.toLocaleString()}</div>
-              </div>
+              { key: "hoy", label: "Hoy" },
+              { key: "historial", label: "Historial" },
+              { key: "estadisticas", label: "Estadísticas" },
+            ].map(({ key, label }) => (
+              <button key={key} onClick={() => setCajaTab(key)} style={{
+                padding: "9px 22px", borderRadius: "8px 8px 0 0", border: "none",
+                borderBottom: cajaTab === key ? `2px solid ${S.accent}` : "2px solid transparent",
+                background: "transparent",
+                color: cajaTab === key ? S.accent : S.muted,
+                fontSize: 13, fontWeight: 700, cursor: "pointer",
+              }}>{label}</button>
             ))}
           </div>
 
-          {/* Pending payments */}
-          {pedidos.filter(p => !p.cobrado && !p.solo_despacho && p.estado !== 'cancelado').length > 0 && (
-            <div style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: S.danger, letterSpacing: "0.08em", marginBottom: 12 }}>
-                ⚠️ COBROS PENDIENTES ({pedidos.filter(p => !p.cobrado && !p.solo_despacho && p.estado !== 'cancelado').length})
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
-                {pedidos.filter(p => !p.cobrado && !p.solo_despacho && p.estado !== 'cancelado').map(p => (
-                  <div key={p.id} className="pulse-border" style={{ padding: 14, borderRadius: 12, background: S.surface, border: `2px solid ${S.danger}40` }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div>
-                        <span style={{ fontWeight: 800, fontSize: 14 }}>#{String(p.numero).padStart(3, "0")}</span>
-                        <span style={{ fontSize: 11, color: S.muted, marginLeft: 8 }}>
-                          {p.tipo === "mesa" ? `Mesa ${p.mesa_numero}` : p.tipo === "barra" ? `Barra (${p.nombre_cliente || "?"})` : "Llevar"}
-                        </span>
-                      </div>
-                      <span style={{ fontWeight: 900, color: S.accent }}>${p.total.toLocaleString()}</span>
-                    </div>
-                    <button onClick={() => setCobrandoPedido(p)} style={{
-                      marginTop: 8, width: "100%", padding: "8px 0", borderRadius: 8, border: "none",
-                      background: S.accent, color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer",
-                    }}>💰 Cobrar ahora</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Transaction log */}
-          <div style={{ fontSize: 11, fontWeight: 800, color: S.muted, letterSpacing: "0.08em", marginBottom: 12 }}>
-            MOVIMIENTOS ({cajaMovimientos.length})
-          </div>
-          {cajaMovimientos.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px 0", color: S.muted, fontSize: 13 }}>Sin movimientos todavía</div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {[...cajaMovimientos].reverse().map((m, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", padding: "12px 16px", borderRadius: 10, background: S.surface, border: `1px solid ${S.border}` }}>
-                  <span style={{ fontSize: 20, marginRight: 12 }}>{m.metodo === "efectivo" ? "💵" : m.metodo === "transferencia" ? "📱" : "📋"}</span>
-                  <div style={{ flex: 1 }}>
-                    <span style={{ fontWeight: 700, fontSize: 13 }}>{m.pedido_num != null ? `Pedido #${String(m.pedido_num).padStart(3, "0")}` : m.referencia || "Pago fiado"}</span>
-                    <span style={{ fontSize: 11, color: S.muted, marginLeft: 8 }}>{m.metodo === "efectivo" ? "Efectivo" : m.metodo === "transferencia" ? "Transferencia" : "Cuenta corriente"}</span>
-                    {m.referencia && <span style={{ fontSize: 10, color: S.info, marginLeft: 6 }}>Ref: {m.referencia}</span>}
-                  </div>
-                  <span style={{ fontWeight: 900, fontSize: 15, color: S.success }}>+${m.monto.toLocaleString()}</span>
-                  <span style={{ fontSize: 10, color: S.muted, marginLeft: 12 }}>{new Date(m.ts).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}</span>
+          {/* ---- SOLAPA HOY ---- */}
+          {cajaTab === "hoy" && (
+            <div style={{ flex: 1, overflow: "auto", padding: 24 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: S.muted, letterSpacing: "0.08em" }}>CAJA DEL DÍA</div>
+                  <div style={{ fontSize: 13, color: S.muted, marginTop: 4 }}>{new Date().toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
                 </div>
-              ))}
-            </div>
-          )}
-
-          {/* Historical cierres */}
-          {cierresHistorial.length > 0 && (
-            <div style={{ marginTop: 24 }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: S.muted, letterSpacing: "0.08em", marginBottom: 12 }}>
-                📅 CIERRES ANTERIORES ({cierresHistorial.length})
+                <button onClick={hacerCierreCaja} style={{
+                  padding: "12px 24px", borderRadius: 12, border: "none", background: S.accent, color: "#fff",
+                  fontSize: 14, fontWeight: 800, cursor: "pointer",
+                }}>📊 Hacer Cierre de Caja</button>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {[...cierresHistorial].reverse().map(c => (
-                  <div key={c.id} style={{ display: "flex", alignItems: "center", padding: "14px 16px", borderRadius: 12, background: S.surface, border: `1px solid ${S.border}` }}>
-                    <span style={{ fontSize: 20, marginRight: 12 }}>📊</span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13 }}>
-                        {new Date(c.fecha).toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
-                      </div>
-                      <div style={{ fontSize: 11, color: S.muted }}>
-                        {c.cantPedidos} pedidos · 💵 ${c.efectivo.toLocaleString()} · 📱 ${c.transferencia.toLocaleString()} · 📋 ${c.fiado.toLocaleString()}
-                      </div>
-                    </div>
-                    <span style={{ fontWeight: 900, fontSize: 18, color: S.accent, marginRight: 12 }}>${c.totalVentas.toLocaleString()}</span>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button onClick={() => setReporteCierre(c)} style={{
-                        padding: "8px 14px", borderRadius: 8, border: `1px solid ${S.border}`, background: S.bg,
-                        color: S.text, fontSize: 11, fontWeight: 700, cursor: "pointer",
-                      }}>👁 Ver</button>
-                      <button onClick={() => descargarCierreHtml(c)} style={{
-                        padding: "8px 14px", borderRadius: 8, border: `1px solid ${S.border}`, background: S.bg,
-                        color: S.text, fontSize: 11, fontWeight: 700, cursor: "pointer",
-                      }}>💾 Guardar</button>
-                    </div>
+
+              {/* Tarjetas resumen */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+                {[
+                  { label: "EFECTIVO", emoji: "💵", color: S.success, monto: cajaMovimientos.filter(m => m.metodo === "efectivo").reduce((s, m) => s + m.monto, 0) },
+                  { label: "TRANSFERENCIAS", emoji: "📱", color: S.info, monto: cajaMovimientos.filter(m => m.metodo === "transferencia").reduce((s, m) => s + m.monto, 0) },
+                  { label: "FIADO", emoji: "📋", color: S.warning, monto: cajaMovimientos.filter(m => m.metodo === "cuenta_corriente").reduce((s, m) => s + m.monto, 0) },
+                  { label: "TOTAL DEL DÍA", emoji: "💰", color: S.accent, monto: cajaMovimientos.reduce((s, m) => s + m.monto, 0) },
+                ].map((c, i) => (
+                  <div key={i} style={{ padding: 20, borderRadius: 16, background: S.surface, border: `2px solid ${c.color}30`, textAlign: "center" }}>
+                    <div style={{ fontSize: 28, marginBottom: 8 }}>{c.emoji}</div>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: S.muted, letterSpacing: "0.06em", marginBottom: 6 }}>{c.label}</div>
+                    <div style={{ fontSize: 28, fontWeight: 900, color: c.color }}>${c.monto.toLocaleString()}</div>
                   </div>
                 ))}
               </div>
+
+              {/* Cobros pendientes */}
+              {pedidos.filter(p => !p.cobrado && !p.solo_despacho && p.estado !== 'cancelado').length > 0 && (
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: S.danger, letterSpacing: "0.08em", marginBottom: 12 }}>
+                    ⚠️ COBROS PENDIENTES ({pedidos.filter(p => !p.cobrado && !p.solo_despacho && p.estado !== 'cancelado').length})
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
+                    {pedidos.filter(p => !p.cobrado && !p.solo_despacho && p.estado !== 'cancelado').map(p => (
+                      <div key={p.id} className="pulse-border" style={{ padding: 14, borderRadius: 12, background: S.surface, border: `2px solid ${S.danger}40` }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div>
+                            <span style={{ fontWeight: 800, fontSize: 14 }}>#{String(p.numero).padStart(3, "0")}</span>
+                            <span style={{ fontSize: 11, color: S.muted, marginLeft: 8 }}>
+                              {p.tipo === "mesa" ? `Mesa ${p.mesa_numero}` : p.tipo === "barra" ? `Barra (${p.nombre_cliente || "?"})` : "Llevar"}
+                            </span>
+                          </div>
+                          <span style={{ fontWeight: 900, color: S.accent }}>${p.total.toLocaleString()}</span>
+                        </div>
+                        <button onClick={() => setCobrandoPedido(p)} style={{
+                          marginTop: 8, width: "100%", padding: "8px 0", borderRadius: 8, border: "none",
+                          background: S.accent, color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer",
+                        }}>💰 Cobrar ahora</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Log de movimientos */}
+              <div style={{ fontSize: 11, fontWeight: 800, color: S.muted, letterSpacing: "0.08em", marginBottom: 12 }}>
+                MOVIMIENTOS ({cajaMovimientos.length})
+              </div>
+              {cajaMovimientos.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "40px 0", color: S.muted, fontSize: 13 }}>Sin movimientos todavía</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {[...cajaMovimientos].reverse().map((m, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", padding: "12px 16px", borderRadius: 10, background: S.surface, border: `1px solid ${S.border}` }}>
+                      <span style={{ fontSize: 20, marginRight: 12 }}>{m.metodo === "efectivo" ? "💵" : m.metodo === "transferencia" ? "📱" : "📋"}</span>
+                      <div style={{ flex: 1 }}>
+                        <span style={{ fontWeight: 700, fontSize: 13 }}>{m.pedido_num != null ? `Pedido #${String(m.pedido_num).padStart(3, "0")}` : m.referencia || "Pago fiado"}</span>
+                        <span style={{ fontSize: 11, color: S.muted, marginLeft: 8 }}>{m.metodo === "efectivo" ? "Efectivo" : m.metodo === "transferencia" ? "Transferencia" : "Cuenta corriente"}</span>
+                        {m.referencia && <span style={{ fontSize: 10, color: S.info, marginLeft: 6 }}>Ref: {m.referencia}</span>}
+                      </div>
+                      <span style={{ fontWeight: 900, fontSize: 15, color: S.success }}>+${m.monto.toLocaleString()}</span>
+                      <span style={{ fontSize: 10, color: S.muted, marginLeft: 12 }}>{new Date(m.ts).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
-          {/* Cierre modal */}
+          {/* ---- SOLAPA HISTORIAL ---- */}
+          {cajaTab === "historial" && (
+            <div style={{ flex: 1, overflow: "auto", padding: 24 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: S.muted, letterSpacing: "0.08em", marginBottom: 16 }}>
+                ÚLTIMOS {cierresHistorial.length} CIERRES
+              </div>
+              {cierresHistorial.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "60px 0", color: S.muted, fontSize: 14 }}>
+                  Sin cierres registrados todavía.
+                  <div style={{ fontSize: 12, marginTop: 6 }}>Hacé un Cierre de Caja desde la solapa Hoy.</div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {[...cierresHistorial].map(c => {
+                    const fecha = new Date(c.fecha);
+                    const fechaStr = fecha.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+                    const horaCierre = fecha.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+                    return (
+                      <div key={c.id} style={{ padding: "16px 18px", borderRadius: 14, background: S.surface, border: `1px solid ${S.border}` }}>
+                        {/* Fila principal: fecha + total + botones */}
+                        <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
+                          <span style={{ fontSize: 18, marginRight: 12 }}>📊</span>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 800, fontSize: 14, textTransform: "capitalize" }}>{fechaStr}</div>
+                            <div style={{ fontSize: 11, color: S.muted, marginTop: 2 }}>Cierre: {horaCierre} · {c.cantPedidos} pedidos</div>
+                          </div>
+                          <span style={{ fontWeight: 900, fontSize: 22, color: S.accent, marginRight: 16 }}>${c.totalVentas.toLocaleString()}</span>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button onClick={async () => {
+                              const savedPeds = c.details && c.details.pedidosCobrados && c.details.pedidosCobrados.length > 0 ? c.details.pedidosCobrados : null;
+                              if (savedPeds) {
+                                setReporteCierre({ ...c, pedidosCobrados: savedPeds, arqueoEfectivo: c.arqueo });
+                              } else {
+                                const fechaParam = new Date(c.fecha).toISOString().slice(0, 10);
+                                const peds = await apiFetch(`/pedidos/por-fecha?fecha=${fechaParam}`);
+                                setReporteCierre({ ...c, pedidosCobrados: peds || [], arqueoEfectivo: c.arqueo });
+                              }
+                            }} style={{
+                              padding: "8px 14px", borderRadius: 8, border: `1px solid ${S.accent}40`,
+                              background: S.accent + "15", color: S.accent, fontSize: 12, fontWeight: 700, cursor: "pointer",
+                            }}>👁 Ver</button>
+                            <button onClick={async () => {
+                              const savedPeds = c.details && c.details.pedidosCobrados && c.details.pedidosCobrados.length > 0 ? c.details.pedidosCobrados : null;
+                              if (savedPeds) {
+                                descargarCierreHtml({ ...c, pedidosCobrados: savedPeds });
+                              } else {
+                                const fechaParam = new Date(c.fecha).toISOString().slice(0, 10);
+                                const peds = await apiFetch(`/pedidos/por-fecha?fecha=${fechaParam}`);
+                                descargarCierreHtml({ ...c, pedidosCobrados: peds || [] });
+                              }
+                            }} style={{
+                              padding: "8px 14px", borderRadius: 8, border: `1px solid ${S.border}`,
+                              background: "transparent", color: S.muted, fontSize: 12, fontWeight: 700, cursor: "pointer",
+                            }}>⬇ Descargar</button>
+                          </div>
+                        </div>
+                        {/* Chips de desglose */}
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          {[
+                            { label: "Efectivo", value: `$${c.efectivo.toLocaleString()}`, color: S.success, emoji: "💵" },
+                            { label: "Transferencias", value: `$${c.transferencia.toLocaleString()}`, color: S.info, emoji: "📱" },
+                            { label: "Fiado", value: `$${c.fiado.toLocaleString()}`, color: S.warning, emoji: "📋" },
+                          ].map((chip, i) => (
+                            <span key={i} style={{ padding: "4px 10px", borderRadius: 8, background: chip.color + "15", border: `1px solid ${chip.color}30`, fontSize: 12, fontWeight: 600, color: chip.color }}>
+                              {chip.emoji} {chip.value} <span style={{ fontWeight: 400, color: S.muted, fontSize: 11 }}>{chip.label}</span>
+                            </span>
+                          ))}
+                          {c.arqueo !== null && c.arqueo !== undefined && (
+                            <span style={{ padding: "4px 10px", borderRadius: 8, background: (c.diferencia === 0 ? S.success : S.danger) + "15", border: `1px solid ${(c.diferencia === 0 ? S.success : S.danger)}30`, fontSize: 12, fontWeight: 700, color: c.diferencia === 0 ? S.success : S.danger }}>
+                              💰 Arqueo {c.diferencia === 0 ? "✅ OK" : c.diferencia > 0 ? `+$${c.diferencia.toLocaleString()}` : `-$${Math.abs(c.diferencia).toLocaleString()}`}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ---- SOLAPA ESTADÍSTICAS ---- */}
+          {cajaTab === "estadisticas" && (
+            <div style={{ flex: 1, overflow: "auto", padding: 24 }}>
+              {/* Selector de rango */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
+                {[
+                  { key: "hoy", label: "Hoy" },
+                  { key: "semana", label: "Esta semana" },
+                  { key: "mes", label: "Este mes" },
+                  { key: "lastmonth", label: "Último mes" },
+                  { key: "all", label: "Todo" },
+                ].map(({ key, label }) => (
+                  <button key={key} onClick={() => setEstadRango(key)} style={{
+                    padding: "8px 18px", borderRadius: 10,
+                    border: `1px solid ${estadRango === key ? S.accent : S.border}`,
+                    background: estadRango === key ? S.accent + "20" : "transparent",
+                    color: estadRango === key ? S.accent : S.muted,
+                    fontSize: 13, fontWeight: 700, cursor: "pointer",
+                  }}>{label}</button>
+                ))}
+              </div>
+
+              {estadLoading ? (
+                <div style={{ textAlign: "center", padding: "80px 0", color: S.muted, fontSize: 14 }}>Cargando estadísticas...</div>
+              ) : !estadData || estadData.pedidosCount === 0 ? (
+                <div style={{ textAlign: "center", padding: "80px 0", color: S.muted, fontSize: 14 }}>No hay pedidos en este período</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+
+                  {/* Resumen general */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+                    {[
+                      { label: "TOTAL VENTAS", emoji: "💰", color: S.accent, value: `$${estadData.totalVentas.toLocaleString()}` },
+                      { label: "TICKET PROMEDIO", emoji: "🧾", color: S.info, value: `$${estadData.ticketPromedio.toLocaleString()}` },
+                      { label: "TOTAL PEDIDOS", emoji: "📋", color: S.success, value: estadData.pedidosCount },
+                      { label: "HORARIO PICO", emoji: "⏰", color: S.warning, value: estadData.horarioPico ? `${estadData.horarioPico.hora}:00 h` : "—" },
+                    ].map((c, i) => (
+                      <div key={i} style={{ padding: 18, borderRadius: 14, background: S.surface, border: `2px solid ${c.color}25`, textAlign: "center" }}>
+                        <div style={{ fontSize: 26, marginBottom: 6 }}>{c.emoji}</div>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: S.muted, letterSpacing: "0.06em" }}>{c.label}</div>
+                        <div style={{ fontSize: 22, fontWeight: 900, color: c.color, marginTop: 4 }}>{c.value}</div>
+                        {c.label === "HORARIO PICO" && estadData.horarioPico && (
+                          <div style={{ fontSize: 11, color: S.muted, marginTop: 2 }}>{estadData.horarioPico.cantidad} pedidos</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Sección 1: Productos más vendidos — torta + lista */}
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: S.muted, letterSpacing: "0.08em", marginBottom: 14 }}>
+                      🏆 PRODUCTOS MÁS VENDIDOS (TOP 8)
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                      {/* Torta */}
+                      <div style={{ padding: 20, borderRadius: 16, background: S.surface, border: `1px solid ${S.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <div style={{ width: 220, height: 220 }}>
+                          {React.createElement(PieChart, {
+                            labels: estadData.productos.slice(0, 8).map(p => p.nombre),
+                            data: estadData.productos.slice(0, 8).map(p => p.cantidad),
+                            colors: PIE_COLORS.slice(0, Math.min(8, estadData.productos.length)),
+                          })}
+                        </div>
+                      </div>
+                      {/* Lista rankeada 1-8 */}
+                      <div style={{ padding: 20, borderRadius: 16, background: S.surface, border: `1px solid ${S.border}` }}>
+                        {estadData.productos.slice(0, 8).map((p, i) => (
+                          <div key={p.id} style={{ display: "flex", alignItems: "center", padding: "7px 0", borderBottom: i < Math.min(7, estadData.productos.length - 1) ? `1px solid ${S.border}20` : "none" }}>
+                            <span style={{ width: 22, height: 22, borderRadius: 6, background: PIE_COLORS[i] + "30", color: PIE_COLORS[i], fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", marginRight: 10, flexShrink: 0 }}>{i + 1}</span>
+                            <span style={{ flex: 1, fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.nombre}</span>
+                            <span style={{ fontWeight: 800, fontSize: 13, marginRight: 10 }}>{p.cantidad} u.</span>
+                            <span style={{ fontWeight: 700, fontSize: 12, color: S.accent }}>${p.total.toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sección 3: Ranking por ganancia */}
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: S.muted, letterSpacing: "0.08em", marginBottom: 12 }}>
+                      💵 RANKING POR GANANCIA (TOP 10)
+                    </div>
+                    <div style={{ borderRadius: 14, overflow: "hidden", border: `1px solid ${S.border}` }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "36px 1fr 70px 100px 60px", padding: "10px 16px", background: S.border + "30" }}>
+                        {["#", "PRODUCTO", "CANT.", "MONTO", "% ING."].map(h => (
+                          <span key={h} style={{ fontSize: 10, fontWeight: 800, color: S.muted, letterSpacing: "0.04em" }}>{h}</span>
+                        ))}
+                      </div>
+                      {[...estadData.productos].sort((a, b) => b.total - a.total).slice(0, 10).map((p, i) => (
+                        <div key={p.id} style={{ display: "grid", gridTemplateColumns: "36px 1fr 70px 100px 60px", padding: "10px 16px", borderBottom: `1px solid ${S.border}20`, background: i % 2 === 0 ? S.surface : S.bg, alignItems: "center" }}>
+                          <span style={{ fontWeight: 900, fontSize: 13, color: i < 3 ? S.accent : S.muted }}>{i + 1}</span>
+                          <span style={{ fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.nombre}</span>
+                          <span style={{ fontWeight: 700, fontSize: 13 }}>{p.cantidad}</span>
+                          <span style={{ fontWeight: 800, fontSize: 13, color: S.accent }}>${p.total.toLocaleString()}</span>
+                          <span style={{ fontSize: 12, color: S.muted }}>{p.pctTotal}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Sección 2: Productos menos vendidos */}
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: S.muted, letterSpacing: "0.08em", marginBottom: 12 }}>
+                      📉 PRODUCTOS MENOS VENDIDOS (BOTTOM 5)
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {[...estadData.productos].sort((a, b) => a.cantidad - b.cantidad).slice(0, 5).map((p) => {
+                        const isLow = p.cantidad < 5;
+                        return (
+                          <div key={p.id} style={{ display: "flex", alignItems: "center", padding: "12px 16px", borderRadius: 12, background: S.surface, border: `1px solid ${isLow ? S.danger + "60" : S.border}` }}>
+                            <span style={{ fontSize: 18, marginRight: 12 }}>📉</span>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 700, fontSize: 14, color: isLow ? S.danger : S.text }}>{p.nombre}</div>
+                              <div style={{ fontSize: 11, color: S.muted, marginTop: 2 }}>{p.pctCantidad}% del total vendido</div>
+                            </div>
+                            <div style={{ textAlign: "right" }}>
+                              <div style={{ fontWeight: 900, fontSize: 20, color: isLow ? S.danger : S.warning }}>{p.cantidad} {isLow ? "⚠️" : ""}</div>
+                              <div style={{ fontSize: 10, color: S.muted }}>unidades</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Modal cierre de caja — visible desde cualquier sub-solapa */}
           {cierreCaja && (
             <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.75)" }}
               onClick={() => setCierreCaja(null)}>
@@ -2739,7 +3005,7 @@ window.__App = function CantinaFull() {
                   <div style={{ fontSize: 12, color: S.muted, marginTop: 4 }}>{cierreCaja.cantPedidos} pedidos</div>
                 </div>
 
-                {/* Arqueo de caja */}
+                {/* Arqueo */}
                 <div style={{ padding: "14px 16px", borderRadius: 12, background: S.bg, border: `1px solid ${S.border}`, marginBottom: 16 }}>
                   <div style={{ fontSize: 11, fontWeight: 800, color: S.muted, letterSpacing: "0.04em", marginBottom: 8 }}>💰 ARQUEO DE CAJA — ¿Cuánto efectivo hay?</div>
                   <input
@@ -2770,9 +3036,24 @@ window.__App = function CantinaFull() {
                   </button>
                   <button onClick={async () => {
                     const cierreConArqueo = { ...cierreCaja, arqueoEfectivo: arqueoEfectivo.length > 0 ? Number(arqueoEfectivo) : null, diferencia: arqueoEfectivo.length > 0 ? Number(arqueoEfectivo) - cierreCaja.efectivo : null };
-                    apiFetch('/cierres', { method: 'POST', body: { efectivo: cierreConArqueo.efectivo, transferencia: cierreConArqueo.transferencia, fiado: cierreConArqueo.fiado, totalVentas: cierreConArqueo.totalVentas, cantPedidos: cierreConArqueo.cantPedidos, arqueo: cierreConArqueo.arqueoEfectivo, diferencia: cierreConArqueo.diferencia } });
+                    const details = {
+                      pedidosCobrados: (cierreConArqueo.pedidosCobrados || []).map(p => ({
+                        id: p.id, numero: p.numero, tipo: p.tipo, mesa_numero: p.mesa_numero,
+                        nombre_cliente: p.nombre_cliente, total: p.total, metodo_pago: p.metodo_pago,
+                        createdAt: p.createdAt,
+                        items: (p.items || []).map(i => ({
+                          cantidad: i.cantidad, precio: i.precio,
+                          nombre: i.producto ? i.producto.nombre : (i.nombre || `Prod #${i.producto_id}`),
+                          observaciones: i.observaciones,
+                        }))
+                      }))
+                    };
+                    const saved = await apiFetch('/cierres', { method: 'POST', body: { efectivo: cierreConArqueo.efectivo, transferencia: cierreConArqueo.transferencia, fiado: cierreConArqueo.fiado, totalVentas: cierreConArqueo.totalVentas, cantPedidos: cierreConArqueo.cantPedidos, arqueo: cierreConArqueo.arqueoEfectivo, diferencia: cierreConArqueo.diferencia, details } });
                     descargarCierreHtml(cierreConArqueo);
-                    setCierresHistorial(prev => [...prev, { ...cierreConArqueo, id: Date.now() }]);
+                    // Agregar al tope del historial (el servidor devuelve desc, el nuevo va primero)
+                    setCierresHistorial(prev => [{ ...(saved || cierreConArqueo), details, id: saved ? saved.id : Date.now() }, ...prev]);
+                    // Forzar recarga de estadísticas si el usuario está en esa solapa
+                    setEstadRefreshKey(k => k + 1);
                     setCierreCaja(null);
                     setReporteCierre(cierreConArqueo);
                     setArqueoEfectivo("");
@@ -3168,7 +3449,7 @@ window.__App = function CantinaFull() {
                 {/* Agregar productos */}
                 <div style={{ fontSize: 10, fontWeight: 800, color: S.muted, letterSpacing: "0.08em", margin: "16px 0 8px" }}>AGREGAR PRODUCTO</div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 6 }}>
-                  {productos.filter(p => p.stock > 0).map(p => {
+                  {productos.map(p => {
                     const cat = p.categoria || getCat(p.cat_id);
                     const enPedido = editarPedido.items.find(i => i.producto_id === p.id);
                     return (
@@ -3236,7 +3517,7 @@ window.__App = function CantinaFull() {
                 ➕ Agregar items al pedido #{String(ped.numero).padStart(3, "0")}
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 8 }}>
-                {productos.filter(p => p.stock > 0).map(p => {
+                {productos.map(p => {
                   const cat = p.categoria || getCat(p.cat_id);
                   return (
                     <button key={p.id} onClick={() => {
@@ -3941,7 +4222,7 @@ function CobrarModal({ pedido, onCobrar, onClose, clientes, S }) {
   useEffect(() => {
     const confirmar = async () => {
       if (!puedeConfirmar()) return;
-      try { await onCobrar(pedido.id, metodo, Number(montoRecibido), referencia, clienteSelec?.id || null); } catch(e) {}
+      try { await onCobrar(pedido.id, metodo, Number(montoRecibido), referencia, clienteSelec?.id || null, descPct || null); } catch(e) {}
     };
     const h = (e) => {
       if (e.key === 'Escape') { e.preventDefault(); onClose(); }
@@ -4110,7 +4391,7 @@ function CobrarModal({ pedido, onCobrar, onClose, clientes, S }) {
                   value={montoRecibido}
                   onChange={e => setMontoRecibido(e.target.value.replace(/\D/g, ''))}
                   onKeyDown={e => {
-                    if (e.key === 'Enter') { e.preventDefault(); if (puedeConfirmar()) onCobrar(pedido.id, metodo, Number(montoRecibido), referencia, clienteSelec?.id || null).catch(()=>{}); }
+                    if (e.key === 'Enter') { e.preventDefault(); if (puedeConfirmar()) onCobrar(pedido.id, metodo, Number(montoRecibido), referencia, clienteSelec?.id || null, descPct || null).catch(()=>{}); }
                   }}
                   placeholder="0"
                   style={{ width: "100%", padding: "8px 10px", borderRadius: 10, border: `2px solid ${montoRecibido ? S.accent : S.border}`, background: S.bg, fontSize: 28, fontWeight: 900, textAlign: "center", color: montoRecibido ? S.text : S.muted, outline: "none", fontFamily: "'JetBrains Mono', monospace" }}
@@ -4162,7 +4443,7 @@ function CobrarModal({ pedido, onCobrar, onClose, clientes, S }) {
                 maxLength={4}
                 value={referencia}
                 onChange={e => setReferencia(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (puedeConfirmar()) onCobrar(pedido.id, metodo, Number(montoRecibido), referencia, clienteSelec?.id || null).catch(()=>{}); } }}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (puedeConfirmar()) onCobrar(pedido.id, metodo, Number(montoRecibido), referencia, clienteSelec?.id || null, descPct || null).catch(()=>{}); } }}
                 placeholder="_ _ _ _"
                 style={{ flex: 1, padding: "10px 14px", borderRadius: 10, border: `2px solid ${referencia ? S.accent : S.border}`, background: S.bg, fontSize: 22, fontWeight: 800, color: S.text, textAlign: "center", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.2em", outline: "none" }}
               />
@@ -4199,7 +4480,7 @@ function CobrarModal({ pedido, onCobrar, onClose, clientes, S }) {
 
         <div style={{ display: "flex", gap: 12 }}>
           <button onClick={onClose} style={{ flex: 1, padding: "12px 0", borderRadius: 12, border: `1px solid ${S.border}`, background: "transparent", color: S.muted, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Cancelar</button>
-          <button onClick={async () => { if (puedeConfirmar()) { try { await onCobrar(pedido.id, metodo, Number(montoRecibido), referencia, clienteSelec?.id || null); } catch(e) { console.error('Cobro error:', e); } } }} disabled={!puedeConfirmar()}
+          <button onClick={async () => { if (puedeConfirmar()) { try { await onCobrar(pedido.id, metodo, Number(montoRecibido), referencia, clienteSelec?.id || null, descPct || null); } catch(e) { console.error('Cobro error:', e); } } }} disabled={!puedeConfirmar()}
             style={{ flex: 1, padding: "12px 0", borderRadius: 12, border: "none", background: puedeConfirmar() ? S.success : S.border, color: puedeConfirmar() ? "#000" : S.muted, fontSize: 13, fontWeight: 800, cursor: puedeConfirmar() ? "pointer" : "not-allowed" }}>
             ✅ Confirmar Cobro
           </button>
