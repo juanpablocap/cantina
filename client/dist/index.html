@@ -415,6 +415,7 @@ window.__App = function CantinaFull() {
   const [conectado, setConectado] = useState(true);
   const [sysHistory, setSysHistory] = useState([]);
   const [backupModal, setBackupModal] = useState(null); // null | { status, message }
+  const [sysActionModal, setSysActionModal] = useState(null); // null | { type:'restart'|'shutdown', status:'confirm'|'loading'|'done'|'error', message }
   const [masSheet, setMasSheet] = useState(false); // Modern POS v2 "Más" drawer
   const mesaInputRef = useRef(null);
   const busquedaRef = useRef(null);
@@ -559,6 +560,7 @@ window.__App = function CantinaFull() {
         if (reporteCierre) { setReporteCierre(null); return; }
         if (cierreCaja) { setCierreCaja(null); return; }
         if (backupModal) { setBackupModal(null); return; }
+        if (sysActionModal && sysActionModal.status === 'confirm') { setSysActionModal(null); return; }
         if (masSheet) { setMasSheet(false); return; }
         if (editingCartItem) { setEditingCartItem(null); return; }
         if (editingProd) { setEditingProd(null); return; }
@@ -3849,6 +3851,24 @@ window.__App = function CantinaFull() {
                 <div style={{ fontSize: 15, fontWeight: 900, color: S.text, marginTop: 2, fontFamily: "'JetBrains Mono', monospace" }}>{ip}</div>
               </div>
             </div>
+            <button onClick={() => setSysActionModal({ type: 'restart', status: 'confirm' })} style={{
+              padding: "10px 18px", borderRadius: 10, border: `1px solid ${S.warning}50`,
+              background: S.warning + "18", color: S.warning,
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+              cursor: "pointer", flexShrink: 0,
+            }}>
+              <span style={{ fontSize: 22 }}>🔄</span>
+              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: "0.04em" }}>REINICIAR</span>
+            </button>
+            <button onClick={() => setSysActionModal({ type: 'shutdown', status: 'confirm' })} style={{
+              padding: "10px 18px", borderRadius: 10, border: `1px solid ${S.danger}50`,
+              background: S.danger + "18", color: S.danger,
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+              cursor: "pointer", flexShrink: 0,
+            }}>
+              <span style={{ fontSize: 22 }}>⏻</span>
+              <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: "0.04em" }}>APAGAR</span>
+            </button>
             <button onClick={() => window.open('/promo.html', '_blank')} style={{
               padding: "10px 18px", borderRadius: 10, border: `1px solid ${S.accent}50`,
               background: S.accent + "18", color: S.accent,
@@ -4117,6 +4137,53 @@ window.__App = function CantinaFull() {
           </div>
         </div>
       )}
+
+      {sysActionModal && (() => {
+        const isShutdown = sysActionModal.type === 'shutdown';
+        const accentColor = isShutdown ? S.danger : S.warning;
+        const ejecutar = async () => {
+          setSysActionModal({ type: sysActionModal.type, status: 'loading', message: isShutdown ? "Apagando el servidor..." : "Reiniciando el servidor..." });
+          try {
+            await apiFetch(isShutdown ? '/system/shutdown' : '/system/restart', { method: 'POST' });
+            setSysActionModal({ type: sysActionModal.type, status: 'done', message: isShutdown ? "El servidor se está apagando." : "El servidor se está reiniciando. La conexión se restablecerá en unos segundos." });
+          } catch(e) {
+            setSysActionModal({ type: sysActionModal.type, status: 'error', message: "Error: " + (e?.message || "desconocido") });
+          }
+        };
+        return (
+          <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.75)" }}>
+            <div style={{ width: 420, padding: 32, borderRadius: 18, background: S.surface, border: `2px solid ${accentColor}`, textAlign: "center" }}>
+              <div style={{ fontSize: 52, marginBottom: 12 }}>
+                {sysActionModal.status === 'loading' ? "⏳" : sysActionModal.status === 'done' ? (isShutdown ? "⏻" : "✅") : sysActionModal.status === 'error' ? "❌" : (isShutdown ? "⏻" : "🔄")}
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: accentColor, marginBottom: 10 }}>
+                {isShutdown ? "Apagar servidor" : "Reiniciar servidor"}
+              </div>
+              {sysActionModal.status === 'confirm' && (
+                <div style={{ fontSize: 15, color: S.muted, marginBottom: 24, lineHeight: 1.5 }}>
+                  {isShutdown
+                    ? "¿Estás seguro? El servidor se apagará y no estará disponible hasta encenderlo manualmente."
+                    : "¿Estás seguro? El servidor se reiniciará y la conexión se interrumpirá por unos segundos."}
+                </div>
+              )}
+              {sysActionModal.status !== 'confirm' && (
+                <div style={{ fontSize: 15, fontWeight: 700, color: S.text, lineHeight: 1.5, marginBottom: 20 }}>{sysActionModal.message}</div>
+              )}
+              {sysActionModal.status === 'confirm' && (
+                <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+                  <button onClick={() => setSysActionModal(null)} style={{ padding: "12px 28px", borderRadius: 10, border: `1px solid ${S.border}`, background: "transparent", color: S.muted, fontSize: 15, fontWeight: 800, cursor: "pointer" }}>Cancelar</button>
+                  <button onClick={ejecutar} style={{ padding: "12px 28px", borderRadius: 10, border: "none", background: accentColor, color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer" }}>
+                    {isShutdown ? "Sí, apagar" : "Sí, reiniciar"}
+                  </button>
+                </div>
+              )}
+              {(sysActionModal.status === 'done' || sysActionModal.status === 'error') && (
+                <button onClick={() => setSysActionModal(null)} style={{ padding: "12px 32px", borderRadius: 10, border: "none", background: sysActionModal.status === 'error' ? S.danger : accentColor, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>OK</button>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ========================================= */}
       {/* TOUCH KEYBOARD MODAL */}

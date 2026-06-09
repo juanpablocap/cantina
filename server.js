@@ -155,6 +155,19 @@ app.post('/api/system/restart/:service', (req, res) => {
   }
 });
 
+// Restart the main app service
+app.post('/api/system/restart', (req, res) => {
+  exec('sudo -n systemctl restart cantina-api', (err) => {
+    if (!res.headersSent) res.json({ ok: true, error: err?.message || null });
+  });
+});
+
+// Shutdown the server
+app.post('/api/system/shutdown', (req, res) => {
+  res.json({ ok: true });
+  setTimeout(() => exec('sudo -n shutdown now'), 500);
+});
+
 // Clear RAM cache
 app.post('/api/system/clear-cache', (req, res) => {
   try {

@@ -269,6 +269,22 @@ sudo bash scripts/setup_netdata.sh  # Instalar/reconfigurar Netdata
 
 ---
 
+## Sudoers — permisos requeridos para el usuario `cantina`
+
+El backend ejecuta comandos con `sudo -n` (no-password). Configurar con `sudo visudo -f /etc/sudoers.d/cantina`:
+
+```
+cantina ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart cantina-api
+cantina ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart postgresql
+cantina ALL=(ALL) NOPASSWD: /usr/bin/tee /proc/sys/vm/drop_caches
+cantina ALL=(ALL) NOPASSWD: /usr/sbin/shutdown
+```
+
+> La línea de `shutdown` es necesaria para el botón "Apagar servidor" de la pantalla Sistema.
+> Verificar rutas con `which systemctl` y `which shutdown` si el servidor usa rutas distintas.
+
+---
+
 ## Notas técnicas
 
 - `escpos` y `escpos-usb` están en dependencies pero la impresión se maneja por el endpoint `/api/pedidos/:id/ticket` que devuelve texto plano. La integración USB directa no está implementada aún.
