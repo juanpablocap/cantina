@@ -103,7 +103,7 @@ fi
 echo ""
 echo -e "${BOLD}${GREEN}✅ Netdata listo${RESET}"
 echo ""
-echo "  Dashboard completo:  http://192.168.100.54/monitor/"
+echo "  Dashboard completo:  http://$(hostname -I | awk '{print $1}')/monitor/"
 echo "  Desde el POS:        pestaña Sistema → botón 📊 Monitor"
 echo ""
 echo "  Para ver métricas en tiempo real:"
