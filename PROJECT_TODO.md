@@ -194,7 +194,7 @@
 * [x] Cómo administrar productos — OPERACION.md
 * [x] Cómo revisar cocina — OPERACION.md
 * [x] Cómo gestionar carrusel TV — OPERACION.md
-* [ ] Guía visual simple — requiere capturas de pantalla
+* [x] Guía visual simple — PDF generado con puppeteer, capturas automáticas de todas las pantallas
 * [x] Errores comunes y solución — RECOVERY.md + OPERACION.md
 
 ## Calidad General
