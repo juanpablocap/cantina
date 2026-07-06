@@ -382,6 +382,7 @@ window.__App = function CantinaFull() {
   const [msgExito, setMsgExito] = useState("");
   const [cobrandoPedido, setCobrandoPedido] = useState(null);
   const [cierreCaja, setCierreCaja] = useState(null);
+  const [cierreBlockado, setCierreBlockado] = useState(null); // pedidos pendientes al intentar cerrar caja
   const [cierresHistorial, setCierresHistorial] = useState([]);
   const [reporteCierre, setReporteCierre] = useState(null);
   const [tick, setTick] = useState(0);
@@ -558,6 +559,7 @@ window.__App = function CantinaFull() {
         if (editarPedido) { setEditarPedido(null); return; }
         if (pinModal) { setPinModal(null); return; }
         if (reporteCierre) { setReporteCierre(null); return; }
+        if (cierreBlockado) { setCierreBlockado(null); return; }
         if (cierreCaja) { setCierreCaja(null); return; }
         if (backupModal) { setBackupModal(null); return; }
         if (sysActionModal && sysActionModal.status === 'confirm') { setSysActionModal(null); return; }
@@ -570,7 +572,7 @@ window.__App = function CantinaFull() {
       }
 
       // Skip if any overlay modal is open
-      if (touchKb || touchNum || cobrandoPedido || cancelarPedido || agregarItemPedido || editarPedido || pinModal || reporteCierre || cierreCaja) return;
+      if (touchKb || touchNum || cobrandoPedido || cancelarPedido || agregarItemPedido || editarPedido || pinModal || reporteCierre || cierreBlockado || cierreCaja) return;
 
       // VENTA tab: typing starts/continues product search
       if (tab === 'venta' && !isInput) {
@@ -937,6 +939,11 @@ window.__App = function CantinaFull() {
 
   // Cierre de caja
   const hacerCierreCaja = () => {
+    const pendientes = pedidos.filter(p => !p.cobrado && p.estado !== 'cancelado');
+    if (pendientes.length > 0) {
+      setCierreBlockado(pendientes);
+      return;
+    }
     const efectivo = cajaMovimientos.filter(m => m.metodo === "efectivo").reduce((s, m) => s + m.monto, 0);
     const transferencia = cajaMovimientos.filter(m => m.metodo === "transferencia").reduce((s, m) => s + m.monto, 0);
     const fiado = cajaMovimientos.filter(m => m.metodo === "cuenta_corriente").reduce((s, m) => s + m.monto, 0);
@@ -2972,6 +2979,44 @@ window.__App = function CantinaFull() {
 
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Modal bloqueo cierre — pedidos pendientes de cobro */}
+          {cierreBlockado && (
+            <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.80)" }}
+              onClick={() => setCierreBlockado(null)}>
+              <div className="anim-in" style={{ width: "100%", maxWidth: 520, padding: 32, borderRadius: 20, background: S.surface, border: `2px solid ${S.danger}60` }}
+                onClick={e => e.stopPropagation()}>
+                <div style={{ textAlign: "center", marginBottom: 20 }}>
+                  <div style={{ fontSize: 48, marginBottom: 8 }}>⚠️</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: S.danger }}>No se puede cerrar la caja</div>
+                  <div style={{ fontSize: 14, color: S.muted, marginTop: 8 }}>
+                    Hay <strong style={{ color: S.text }}>{cierreBlockado.length} pedido{cierreBlockado.length !== 1 ? "s" : ""}</strong> sin cobrar. Cobralos o cancelalos antes de cerrar.
+                  </div>
+                </div>
+                <div style={{ maxHeight: 280, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
+                  {cierreBlockado.map(p => {
+                    const destino = p.tipo === "mesa" ? `Mesa ${p.mesa_numero}` : p.tipo === "barra" ? "Barra" : "Llevar";
+                    const estadoLabel = { pendiente: "Pendiente", en_preparacion: "En preparación", listo: "Listo", entregado: "Entregado" }[p.estado] || p.estado;
+                    const estadoColor = { pendiente: S.danger, en_preparacion: S.warning, listo: S.success, entregado: S.info }[p.estado] || S.muted;
+                    return React.createElement("div", {
+                      key: p.id,
+                      style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 10, background: S.bg, border: `1px solid ${S.border}` }
+                    },
+                      React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } },
+                        React.createElement("div", { style: { fontWeight: 800, color: S.accent, fontSize: 13 } }, `#${String(p.numero).padStart(3,"0")}`),
+                        React.createElement("div", { style: { fontSize: 13, color: S.text } }, destino),
+                        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: estadoColor, background: estadoColor + "20", padding: "2px 8px", borderRadius: 6 } }, estadoLabel)
+                      ),
+                      React.createElement("div", { style: { fontWeight: 800, color: S.text, fontSize: 14 } }, `$${p.total.toLocaleString()}`)
+                    );
+                  })}
+                </div>
+                <button onClick={() => setCierreBlockado(null)} style={{ width: "100%", padding: "13px 0", borderRadius: 12, border: "none", background: S.accent, color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer" }}>
+                  Entendido — ir a cobrar
+                </button>
+              </div>
             </div>
           )}
 
