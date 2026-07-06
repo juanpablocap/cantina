@@ -1,5 +1,9 @@
 # TODO Proyecto Cantina POS
 
+## UX / Features recientes (julio 2026)
+
+* [x] Cierre de caja bloqueado si hay pedidos sin cobrar: muestra modal de advertencia con lista de pedidos pendientes (número, destino, estado, total) — el cierre solo procede cuando todos están cobrados o cancelados
+
 ## UX / Features recientes (junio 2026)
 
 * [x] Pantalla Caja: 3 solapas — Hoy / Historial / Estadísticas
