@@ -4,6 +4,8 @@ Sistema POS touchscreen para cantina corporativa argentina. Corre 100% en LAN, s
 
 **Server:** `192.168.100.54` — `ssh cantina@192.168.100.54`
 
+**GitHub:** `https://github.com/juanpablocap/cantina.git` — el hook post-commit hace push automático tras cada commit.
+
 ## Stack
 
 - **Backend:** Node.js 20 + Express 5 + Prisma 5 + PostgreSQL 18 + Socket.io 4
