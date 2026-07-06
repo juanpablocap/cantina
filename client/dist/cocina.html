@@ -100,9 +100,9 @@ window.__App = function CocinaDisplay() {
   const playAlarm = useCallback(() => {
     try {
       const c = new AudioContext();
-      const p = (f, t, d) => { const o = c.createOscillator(); const g = c.createGain(); o.connect(g); g.connect(c.destination); o.frequency.value = f; o.type = "sine"; g.gain.setValueAtTime(0.35, c.currentTime + t); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + t + d); o.start(c.currentTime + t); o.stop(c.currentTime + t + d); };
-      p(880, 0, .9); p(1108, .3, .9);
-      p(880, 1.1, .9); p(1108, 1.4, .9);
+      const p = (f, t, d) => { const o = c.createOscillator(); const g = c.createGain(); o.connect(g); g.connect(c.destination); o.frequency.value = f; o.type = "triangle"; g.gain.setValueAtTime(0.7, c.currentTime + t); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + t + d); o.start(c.currentTime + t); o.stop(c.currentTime + t + d); };
+      p(880, 0, 1.0); p(1108, .35, 1.0);
+      p(880, 1.2, 1.0); p(1108, 1.55, 1.0);
       setTimeout(() => c.close(), 3000);
     } catch (e) {}
   }, []);
