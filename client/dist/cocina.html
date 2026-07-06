@@ -50,6 +50,7 @@ window.__App = function CocinaDisplay() {
   const [usuarios, setUsuarios] = useState([]);
   const [mesasMozos, setMesasMozos] = useState({});
   const prevPedidosRef = useRef([]);
+  const [nuevoPedidoSignal, setNuevoPedidoSignal] = useState(0);
 
   const hashItems = (items) =>
     (items || [])
@@ -75,6 +76,9 @@ window.__App = function CocinaDisplay() {
         });
         if (Object.keys(nuevosModificados).length > 0)
           setPedidosModificados(prev => ({ ...prev, ...nuevosModificados }));
+        // Detectar pedidos nuevos y disparar alarma
+        const hayNuevos = activos.some(newP => !prev.find(p => p.id === newP.id));
+        if (hayNuevos) setNuevoPedidoSignal(s => s + 1);
       }
       prevPedidosRef.current = activos;
       setPedidos(activos);
@@ -103,6 +107,10 @@ window.__App = function CocinaDisplay() {
       setTimeout(() => c.close(), 3000);
     } catch (e) {}
   }, []);
+
+  useEffect(() => {
+    if (nuevoPedidoSignal > 0) playAlarm();
+  }, [nuevoPedidoSignal, playAlarm]);
 
   const playBell = useCallback(() => {
     try {

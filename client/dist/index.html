@@ -370,6 +370,7 @@ window.__App = function CantinaFull() {
   const [clienteForm, setClienteForm] = useState(null);
   const [pagoForm, setPagoForm] = useState(null);
   const [clienteExpandido, setClienteExpandido] = useState(null);
+  const [clienteHistorial, setClienteHistorial] = useState({}); // { [cliente_id]: pedidos[] }
   const [pinModal, setPinModal] = useState(null);
   const [prodCatFilter, setProdCatFilter] = useState(null);
   const [catActiva, setCatActiva] = useState(null);
@@ -2083,13 +2084,55 @@ window.__App = function CantinaFull() {
         <div style={{ flex: 1, overflow: "auto", padding: 24 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: S.muted, letterSpacing: "0.08em" }}>
-              CLIENTES ({clientes.length}) · Deuda total: <span style={{ color: S.warning }}>${clientes.reduce((s, c) => s + c.saldo, 0).toLocaleString()}</span>
+              CLIENTES ({clientes.length})
             </div>
             <button onClick={() => setClienteForm({ mode: "nuevo", nombre: "", apellido: "", apodo: "", division: "", whatsapp: "" })} style={{
               padding: "10px 20px", borderRadius: 10, border: "none", background: S.accent, color: "#fff",
               fontSize: 13, fontWeight: 800, cursor: "pointer",
             }}>+ Nuevo Cliente</button>
           </div>
+
+          {/* ---- PANEL DEUDAS FIADO ---- */}
+          {(() => {
+            const deudores = clientes.filter(c => c.saldo > 0).sort((a, b) => b.saldo - a.saldo);
+            const totalDeuda = deudores.reduce((s, c) => s + c.saldo, 0);
+            if (deudores.length === 0) return null;
+            return (
+              <div className="anim-in" style={{ marginBottom: 20, borderRadius: 16, background: S.surface, border: `2px solid ${S.warning}40`, overflow: "hidden" }}>
+                <div style={{ padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${S.border}` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 20 }}>📋</span>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: S.warning }}>FIADO PENDIENTE</div>
+                      <div style={{ fontSize: 11, color: S.muted }}>{deudores.length} cliente{deudores.length !== 1 ? "s" : ""} con deuda</div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: S.muted }}>TOTAL ADEUDADO</div>
+                    <div style={{ fontSize: 26, fontWeight: 900, color: S.warning }}>${totalDeuda.toLocaleString()}</div>
+                  </div>
+                </div>
+                <div style={{ padding: "10px 18px", display: "flex", flexDirection: "column", gap: 6 }}>
+                  {deudores.slice(0, 5).map((c, i) => (
+                    <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ fontSize: 12, fontWeight: 900, color: S.muted, width: 18, textAlign: "right" }}>#{i + 1}</div>
+                      <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: S.text }}>
+                        {c.nombre} {c.apellido}
+                        {c.division && <span style={{ fontSize: 11, color: S.muted, marginLeft: 6 }}>{c.division}</span>}
+                      </div>
+                      <div style={{ fontWeight: 900, fontSize: 14, color: S.warning }}>${c.saldo.toLocaleString()}</div>
+                      <div style={{ fontSize: 11, color: S.muted }}>({((c.saldo / totalDeuda) * 100).toFixed(0)}%)</div>
+                    </div>
+                  ))}
+                  {deudores.length > 5 && (
+                    <div style={{ fontSize: 11, color: S.muted, paddingLeft: 28, marginTop: 2 }}>
+                      + {deudores.length - 5} cliente{deudores.length - 5 !== 1 ? "s" : ""} más
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* ---- FORM: Nuevo / Editar cliente ---- */}
           {clienteForm && (
@@ -2242,8 +2285,8 @@ window.__App = function CantinaFull() {
                 return a.nombre.localeCompare(b.nombre, 'es');
               }).map(c => {
                 const pagosCliente = clientePagos.filter(p => p.cliente_id === c.id);
-                const comprasCliente = pedidos.filter(p => p.cliente_id === c.id && p.cobrado);
                 const isExpanded = clienteExpandido === c.id;
+                const comprasCliente = clienteHistorial[c.id] || pedidos.filter(p => p.cliente_id === c.id && p.cobrado);
                 return (
                 <div key={c.id} className="anim-in" style={{
                   borderRadius: 14, background: S.surface, border: `2px solid ${c.saldo > 0 ? S.warning + "40" : S.border}`,
@@ -2251,7 +2294,14 @@ window.__App = function CantinaFull() {
                 }}>
                   {/* Client row */}
                   <div style={{ display: "flex", alignItems: "center", padding: "14px 16px", gap: 14, cursor: "pointer" }}
-                    onClick={() => setClienteExpandido(isExpanded ? null : c.id)}>
+                    onClick={async () => {
+                      const nextId = isExpanded ? null : c.id;
+                      setClienteExpandido(nextId);
+                      if (nextId && !clienteHistorial[nextId]) {
+                        const hist = await apiFetch(`/clientes/${nextId}/pedidos`);
+                        if (hist) setClienteHistorial(prev => ({ ...prev, [nextId]: hist }));
+                      }
+                    }}>
                     <div style={{ width: 40, height: 40, borderRadius: 10, background: S.accent + "20", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 900, color: S.accent, flexShrink: 0 }}>
                       {c.nombre[0]}{c.apellido ? c.apellido[0] : ""}
                     </div>
@@ -2298,13 +2348,14 @@ window.__App = function CantinaFull() {
                     <div className="anim-in" style={{ borderTop: `2px solid ${S.border}` }}>
                       {/* Compras (purchases) */}
                       <div style={{ padding: "12px 16px" }}>
-                        <div style={{ fontSize: 10, fontWeight: 800, color: S.accent, letterSpacing: "0.06em", marginBottom: 8 }}>
-                          🛒 COMPRAS ({comprasCliente.length})
+                        <div style={{ fontSize: 10, fontWeight: 800, color: S.accent, letterSpacing: "0.06em", marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+                          🛒 HISTORIAL DE COMPRAS ({comprasCliente.length})
+                          {!clienteHistorial[c.id] && <span style={{ fontSize: 10, color: S.muted, fontWeight: 400 }}>cargando...</span>}
                         </div>
                         {comprasCliente.length === 0 ? (
                           <div style={{ fontSize: 12, color: S.muted, padding: "8px 0" }}>Sin compras registradas</div>
                         ) : (
-                          comprasCliente.slice(-10).reverse().map(p => (
+                          comprasCliente.slice(0, 20).map(p => (
                             <div key={p.id} style={{ padding: "8px 0", borderBottom: `1px solid ${S.border}20` }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

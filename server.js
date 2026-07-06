@@ -314,6 +314,18 @@ app.put('/api/clientes/:id', async (req, res) => {
     res.json(client);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
+app.get('/api/clientes/:id/pedidos', async (req, res) => {
+  try {
+    const pedidos = await prisma.pedido.findMany({
+      where: { cliente_id: Number(req.params.id), cobrado: true },
+      include: { items: { include: { producto: { select: { nombre: true } } } } },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+    res.json(pedidos);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/clientes/:id/pago', async (req, res) => {
   try {
     const { monto } = req.body;
