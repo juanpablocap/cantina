@@ -74,7 +74,7 @@ app.get('/api/system', async (req, res) => {
     let lastBackup = null;
     const backupDir = path.join(__dirname, 'backups');
     if (fs.existsSync(backupDir)) {
-      const files = fs.readdirSync(backupDir).filter(f => f.endsWith('.sql')).sort().reverse();
+      const files = fs.readdirSync(backupDir).filter(f => f.startsWith('cantina_') && f.endsWith('.sql')).sort().reverse();
       if (files.length > 0) {
         const stat = fs.statSync(path.join(backupDir, files[0]));
         lastBackup = { file: files[0], date: stat.mtime, size: (stat.size / 1024).toFixed(0) + ' KB' };
@@ -450,6 +450,7 @@ app.put('/api/pedidos/:id/items', async (req, res) => {
   try {
     const { items } = req.body;
     if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'items requeridos' });
+    if (items.some(i => !Number.isInteger(i.cantidad) || i.cantidad <= 0)) return res.status(400).json({ error: 'cantidad inválida' });
     const pedidoId = Number(req.params.id);
 
     const pedido = await prisma.$transaction(async tx => {
