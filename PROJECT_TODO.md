@@ -1,5 +1,16 @@
 # TODO Proyecto Cantina POS
 
+## Puesta en producción
+
+* [ ] **Reset a producción** — correr `bash scripts/reset_produccion.sh` el día de entrega: borra todos los datos de prueba (pedidos, clientes, productos, categorías, cierres, carrusel), conserva usuarios. Hace backup automático antes y después.
+* [ ] Cargar categorías reales (Admin → Categorías)
+* [ ] Cargar carta de productos real (Admin → Productos)
+* [ ] Cargar clientes con cuenta corriente (Cuentas → Nuevo cliente)
+* [ ] Configurar usuarios/mozos con sus PINs reales
+* [ ] Subir imágenes reales al carrusel TV (Sistema → Carrusel)
+* [ ] Primer backup real después del reset: `bash scripts/backup.sh`
+* [ ] Verificar sistema completo antes de entregar: `bash scripts/healthcheck.sh`
+
 ## UX / Features recientes (julio 2026)
 
 * [x] Cierre de caja bloqueado si hay pedidos sin cobrar: muestra modal de advertencia con lista de pedidos pendientes (número, destino, estado, total) — el cierre solo procede cuando todos están cobrados o cancelados
