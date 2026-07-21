@@ -1,0 +1,248 @@
+// printer.js — Impresora térmica Epson TM-T88 / M244A vía /dev/usb/lp*
+// ESC/POS raw (sin dependencias nativas). Encoding CP858 vía iconv-lite.
+// 80mm = 48 caracteres por línea @ font A.
+
+const fs = require('fs');
+const os = require('os');
+const iconv = require('iconv-lite');
+
+const CANDIDATES = ['/dev/usb/lp0', '/dev/usb/lp1', '/dev/usb/lp2', '/dev/lp0', '/dev/lp1'];
+const WIDTH = 48;
+const CODEPAGE = 'cp858';
+const NAME_MAX = 22;   // caracteres máximos del nombre de un item antes de truncar
+
+const ESC = 0x1B, GS = 0x1D;
+const C = {
+  init:          Buffer.from([ESC, 0x40]),
+  cp858:         Buffer.from([ESC, 0x74, 19]),   // charset PC858 Multilingual + Euro
+  align_l:       Buffer.from([ESC, 0x61, 0]),
+  align_c:       Buffer.from([ESC, 0x61, 1]),
+  align_r:       Buffer.from([ESC, 0x61, 2]),
+  bold_on:       Buffer.from([ESC, 0x45, 1]),
+  bold_off:      Buffer.from([ESC, 0x45, 0]),
+  underline_on:  Buffer.from([ESC, 0x2D, 1]),
+  underline_off: Buffer.from([ESC, 0x2D, 0]),
+  size_normal:   Buffer.from([GS, 0x21, 0x00]),
+  size_dbl_h:    Buffer.from([GS, 0x21, 0x01]),
+  size_dbl_w:    Buffer.from([GS, 0x21, 0x10]),
+  size_dbl_wh:   Buffer.from([GS, 0x21, 0x11]),
+  feed:          (n) => Buffer.from([ESC, 0x64, n]),
+  // Corte parcial con feed de 120 dots (~15mm) — asegura que el papel pase la cuchilla
+  cut:           Buffer.from([GS, 0x56, 66, 120]),
+
+  // Oscurecimiento (universal ESC/POS)
+  double_strike_on:  Buffer.from([ESC, 0x47, 1]),  // cada punto disparado dos veces → texto más oscuro
+  double_strike_off: Buffer.from([ESC, 0x47, 0]),
+  // Comando específico Epson TM: GS ( E fn=5 (densidad de impresión), valor máximo
+  epson_density_max: Buffer.from([GS, 0x28, 0x45, 0x02, 0x00, 0x05, 0x08]),
+};
+
+function findPrinterDevice() {
+  for (const p of CANDIDATES) {
+    try { if (fs.existsSync(p)) return p; } catch (e) {}
+  }
+  return null;
+}
+
+function isConnected() {
+  const dev = findPrinterDevice();
+  if (!dev) return false;
+  try { fs.accessSync(dev, fs.constants.W_OK); return true; }
+  catch (e) { return false; }
+}
+
+const txt = (s) => iconv.encode(String(s == null ? '' : s), CODEPAGE);
+const rule = (ch = '-') => txt(ch.repeat(WIDTH) + '\n');
+
+function pad(s, n) {
+  s = String(s);
+  return s.length >= n ? s.slice(0, n) : s + ' '.repeat(n - s.length);
+}
+function padLeft(s, n) {
+  s = String(s);
+  return s.length >= n ? s.slice(-n) : ' '.repeat(n - s.length) + s;
+}
+function trunc(s, n) {
+  s = String(s || '');
+  return s.length > n ? s.slice(0, n - 1) + '…' : s;
+}
+function money(n) {
+  return '$' + Number(n || 0).toLocaleString('es-AR');
+}
+
+function writeToPrinter(buf) {
+  const dev = findPrinterDevice();
+  if (!dev) return Promise.reject(new Error('Impresora no detectada (revisar USB / udev)'));
+  // O_NONBLOCK evita que el write bloquee el thread pool de libuv si la impresora
+  // no está lista — en ese caso el kernel devuelve EAGAIN inmediatamente.
+  const flags = fs.constants.O_WRONLY | fs.constants.O_NONBLOCK;
+  return new Promise((resolve, reject) => {
+    fs.open(dev, flags, (openErr, fd) => {
+      if (openErr) return reject(openErr);
+      fs.write(fd, buf, 0, buf.length, null, (writeErr) => {
+        fs.close(fd, () => {
+          if (writeErr) {
+            const msg = (writeErr.code === 'EAGAIN' || writeErr.code === 'EWOULDBLOCK')
+              ? 'Impresora sin respuesta (apagada, sin papel o en error)'
+              : writeErr.message;
+            reject(new Error(msg));
+          } else {
+            resolve(dev);
+          }
+        });
+      });
+    });
+  });
+}
+
+function buildTicketBuffer(pedido) {
+  const fecha = new Date(pedido.createdAt || Date.now());
+  const fechaStr = fecha.toLocaleDateString('es-AR');
+  const horaStr  = fecha.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  const tipo   = pedido.tipo === 'mesa' ? `Mesa ${pedido.mesa_numero}` : 'Barra';
+  const numero = String(pedido.numero || 0).padStart(3, '0');
+
+  const parts = [];
+  parts.push(C.init, C.cp858, C.epson_density_max, C.double_strike_on);
+
+  // Header
+  parts.push(C.align_c, C.size_dbl_wh, C.bold_on);
+  parts.push(txt('CANTINA\n'));
+  parts.push(C.size_normal, C.bold_off);
+  parts.push(txt('Sistema POS\n'));
+  parts.push(rule('='));
+
+  // Meta
+  parts.push(C.align_l);
+  parts.push(txt(`Fecha: ${fechaStr}  Hora: ${horaStr}\n`));
+  parts.push(C.bold_on, txt(`Pedido #${numero}   ${tipo}\n`), C.bold_off);
+  if (pedido.nombre_cliente) parts.push(txt(`Cliente: ${pedido.nombre_cliente}\n`));
+  parts.push(rule('-'));
+
+  // Items
+  for (const it of (pedido.items || [])) {
+    const nombreRaw = it.nombre || (it.producto && it.producto.nombre) || '?';
+    const nombre = trunc(nombreRaw, NAME_MAX);
+    const cant = it.cantidad || 1;
+    const precio = it.precio || 0;
+    const subtotal = cant * precio;
+    const label = `${cant}x ${nombre}`;
+    parts.push(txt(pad(label, WIDTH - 12) + padLeft(money(subtotal), 12) + '\n'));
+    if (cant > 1) {
+      parts.push(txt('   ' + pad(`${money(precio)} c/u`, WIDTH - 3) + '\n'));
+    }
+    if (it.observaciones) {
+      const obs = String(it.observaciones);
+      const maxLen = WIDTH - 5;
+      for (let i = 0; i < obs.length; i += maxLen) {
+        parts.push(txt('   >> ' + obs.slice(i, i + maxLen) + '\n'));
+      }
+    }
+  }
+
+  parts.push(rule('-'));
+
+  // Total en doble alto + bold
+  parts.push(C.size_dbl_h, C.bold_on);
+  parts.push(txt(pad('TOTAL', 18) + padLeft(money(pedido.total), 6) + '\n'));
+  parts.push(C.size_normal, C.bold_off);
+
+  if (pedido.metodo_pago) {
+    const met = pedido.metodo_pago === 'efectivo' ? 'Efectivo'
+              : pedido.metodo_pago === 'transferencia' ? 'Transferencia'
+              : pedido.metodo_pago === 'cuenta_corriente' ? 'Cuenta corriente'
+              : pedido.metodo_pago;
+    parts.push(txt(`Pago: ${met}\n`));
+    if (pedido.cliente) {
+      parts.push(txt(`Cliente: ${pedido.cliente.nombre || ''} ${pedido.cliente.apellido || ''}\n`.replace(/\s+\n/, '\n')));
+    }
+  }
+
+  parts.push(rule('='));
+  parts.push(C.align_c);
+  parts.push(txt('¡Gracias por su compra!\n'));
+  parts.push(C.align_l);
+  parts.push(C.double_strike_off);
+  parts.push(C.feed(1));      // avance mínimo — el corte ya incluye 120 dots de feed
+  parts.push(C.cut);
+
+  return Buffer.concat(parts);
+}
+
+function buildTestBuffer() {
+  const parts = [];
+  parts.push(C.init, C.cp858, C.epson_density_max, C.double_strike_on);
+  parts.push(C.align_c, C.size_dbl_wh, C.bold_on);
+  parts.push(txt('CANTINA POS\n'));
+  parts.push(C.size_normal, C.bold_off);
+  parts.push(txt('Prueba de impresión\n'));
+  parts.push(rule('='));
+  parts.push(C.align_l);
+  parts.push(txt(`Fecha: ${new Date().toLocaleString('es-AR')}\n`));
+  parts.push(txt(`Host:  ${os.hostname()}\n`));
+  parts.push(txt(`Nodo:  ${process.version}\n`));
+  parts.push(rule('-'));
+  parts.push(txt('Acentos: áéíóú ÁÉÍÓÚ ñ Ñ ü Ü\n'));
+  parts.push(txt('Símbolos: ¿ ¡ $ 1.234,56 €\n'));
+  parts.push(rule('-'));
+  parts.push(C.bold_on, txt('Negrita OK\n'), C.bold_off);
+  parts.push(C.underline_on, txt('Subrayado OK\n'), C.underline_off);
+  parts.push(C.size_dbl_h, txt('Doble alto\n'), C.size_normal);
+  parts.push(C.size_dbl_wh, txt('Doble WxH\n'), C.size_normal);
+  parts.push(rule('='));
+  parts.push(C.align_c);
+  parts.push(txt('Impresora funcionando correctamente\n'));
+  parts.push(C.align_l);
+  parts.push(C.double_strike_off);
+  parts.push(C.feed(1));      // avance mínimo — el corte ya incluye 120 dots de feed
+  parts.push(C.cut);
+  return Buffer.concat(parts);
+}
+
+async function printTicket(pedido) {
+  try {
+    if (!pedido) { console.error('[printer] printTicket recibió pedido null'); return false; }
+    if (!isConnected()) {
+      const dev = findPrinterDevice();
+      console.error('[printer] no imprimible:', dev ? `sin permiso en ${dev}` : 'device no detectado');
+      return false;
+    }
+    const buf = buildTicketBuffer(pedido);
+    const dev = await writeToPrinter(buf);
+    console.log(`[printer] ticket #${pedido.numero} impreso en ${dev}`);
+    return true;
+  } catch (e) {
+    console.error('[printer] error imprimiendo ticket:', e.message);
+    return false;
+  }
+}
+
+async function printTest() {
+  try {
+    if (!isConnected()) {
+      const dev = findPrinterDevice();
+      const error = dev ? `sin permiso en ${dev}` : 'device no detectado (revisar USB)';
+      console.error('[printer] test cancelado:', error);
+      return { success: false, error };
+    }
+    const buf = buildTestBuffer();
+    const dev = await writeToPrinter(buf);
+    console.log(`[printer] test impreso en ${dev}`);
+    return { success: true, device: dev };
+  } catch (e) {
+    console.error('[printer] error test:', e.message);
+    return { success: false, error: e.message };
+  }
+}
+
+function status() {
+  const dev = findPrinterDevice();
+  return {
+    connected: isConnected(),
+    device: dev,
+    codepage: CODEPAGE,
+    width: WIDTH,
+  };
+}
+
+module.exports = { printTicket, printTest, status, findPrinterDevice, isConnected };

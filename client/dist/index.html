@@ -3822,6 +3822,17 @@ window.__App = function CantinaFull() {
                         background: S.border, color: S.muted, fontSize: 11, fontWeight: 700, cursor: "pointer",
                       }}>🔄 Reiniciar</button>
                     )}
+                    {s.k === "printer" && (
+                      <button onClick={async () => {
+                        showMsg("🖨️ Enviando prueba...");
+                        const r = await apiFetch('/printer/test');
+                        if (r && r.success) showMsg("✅ Prueba enviada (" + (r.device || "impresora") + ")");
+                        else showMsg("❌ " + (r?.error || "Error al imprimir"));
+                      }} style={{
+                        marginTop: 5, padding: "4px 0", width: "100%", borderRadius: 5, border: "none",
+                        background: S.info + "25", color: S.info, fontSize: 11, fontWeight: 800, cursor: "pointer",
+                      }}>🧪 Probar</button>
+                    )}
                   </div>
                 ))}
               </div>

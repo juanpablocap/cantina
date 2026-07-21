@@ -23,6 +23,11 @@ app.use(express.json({ limit: '15mb' }));
 app.use('/images', express.static(path.join(__dirname, 'images')));
 
 // ============================================
+// PRINTER (módulo separado — ver printer.js)
+// ============================================
+const printer = require('./printer');
+
+// ============================================
 // HEALTH & SYSTEM
 // ============================================
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: Date.now() }));
@@ -107,8 +112,8 @@ app.get('/api/system', async (req, res) => {
     // Printer & scanner detection
     let printerOk = false, scannerOk = false;
     try {
+      printerOk = printer.isConnected();
       const lsusb = execSync('lsusb 2>/dev/null', { timeout: 2000 }).toString();
-      printerOk = /printer|thermal|receipt|0483|1a86/i.test(lsusb) || fs.existsSync('/dev/usb/lp0');
       scannerOk = /barcode|scanner|hid/i.test(lsusb);
     } catch(e) {}
 
@@ -528,11 +533,42 @@ app.post('/api/pedidos/:id/cobrar', async (req, res) => {
       return pedido;
     });
     io.emit('pedido-actualizado', pedido);
+    // Imprimir ticket automáticamente (fire-and-forget, no bloquea la respuesta)
+    printer.printTicket(pedido).catch(err => console.error('[printer] cobro fail:', err.message));
     res.json(pedido);
   } catch(e) {
     console.error('Cobro error:', e);
     res.status(e.status || 500).json({ error: e.message });
   }
+});
+
+// ============================================
+// PRINTER endpoints
+// ============================================
+app.post('/api/print/:pedidoId', async (req, res) => {
+  try {
+    const pedido = await prisma.pedido.findUnique({
+      where: { id: Number(req.params.pedidoId) },
+      include: { items: { include: { producto: true } }, cliente: true }
+    });
+    if (!pedido) return res.status(404).json({ success: false, error: 'Pedido no encontrado' });
+    const ok = await printer.printTicket(pedido);
+    if (ok) res.json({ success: true });
+    else res.status(500).json({ success: false, error: 'No se pudo imprimir (revisar conexión/permiso)' });
+  } catch(e) {
+    console.error('[printer] print pedido error:', e.message);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/printer/test', async (req, res) => {
+  const r = await printer.printTest();
+  if (r.success) res.json(r);
+  else res.status(500).json(r);
+});
+
+app.get('/api/printer/status', (req, res) => {
+  res.json(printer.status());
 });
 
 app.post('/api/pedidos/:id/cancelar', async (req, res) => {
