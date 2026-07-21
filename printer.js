@@ -4,6 +4,8 @@
 
 const fs = require('fs');
 const os = require('os');
+const path = require('path');
+const { execFile } = require('child_process');
 const iconv = require('iconv-lite');
 
 const CANDIDATES = ['/dev/usb/lp0', '/dev/usb/lp1', '/dev/usb/lp2', '/dev/lp0', '/dev/lp1'];
@@ -73,23 +75,23 @@ function money(n) {
 function writeToPrinter(buf) {
   const dev = findPrinterDevice();
   if (!dev) return Promise.reject(new Error('Impresora no detectada (revisar USB / udev)'));
-  // O_NONBLOCK evita que el write bloquee el thread pool de libuv si la impresora
-  // no está lista — en ese caso el kernel devuelve EAGAIN inmediatamente.
-  const flags = fs.constants.O_WRONLY | fs.constants.O_NONBLOCK;
+  // Usamos un proceso hijo (cat tmp > dev) para el write blocking al char device:
+  // fs.write con O_NONBLOCK produce escrituras parciales en usblp; blocking está
+  // bien en un proceso separado y el timeout lo mata si la impresora no responde.
+  const tmp = path.join(os.tmpdir(), `.escpos_${process.pid}_${Date.now()}.bin`);
   return new Promise((resolve, reject) => {
-    fs.open(dev, flags, (openErr, fd) => {
-      if (openErr) return reject(openErr);
-      fs.write(fd, buf, 0, buf.length, null, (writeErr) => {
-        fs.close(fd, () => {
-          if (writeErr) {
-            const msg = (writeErr.code === 'EAGAIN' || writeErr.code === 'EWOULDBLOCK')
-              ? 'Impresora sin respuesta (apagada, sin papel o en error)'
-              : writeErr.message;
-            reject(new Error(msg));
-          } else {
-            resolve(dev);
-          }
-        });
+    fs.writeFile(tmp, buf, (wErr) => {
+      if (wErr) return reject(wErr);
+      execFile('sh', ['-c', `cat -- '${tmp}' > '${dev}'`], { timeout: 10000 }, (err) => {
+        fs.unlink(tmp, () => {});
+        if (err) {
+          const msg = err.killed
+            ? 'Timeout: impresora sin respuesta (apagada, sin papel o en error)'
+            : err.message;
+          reject(new Error(msg));
+        } else {
+          resolve(dev);
+        }
       });
     });
   });
