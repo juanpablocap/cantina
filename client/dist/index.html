@@ -3801,7 +3801,7 @@ window.__App = function CantinaFull() {
         ];
 
         return (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "12px 16px", gap: 10, overflow: "hidden" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "12px 16px", gap: 10, overflowY: "auto" }}>
           {/* Row 1: Services + Actions */}
           <div style={{ display: "flex", gap: 10, flex: "0 0 auto" }}>
             {/* Services grid */}
@@ -3977,7 +3977,7 @@ window.__App = function CantinaFull() {
           </div>
 
           {/* Row 4: Image Manager */}
-          <div style={{ flex: "1 1 auto", display: "flex", gap: 10, minHeight: 0, overflow: "hidden" }}>
+          <div style={{ flex: "1 1 auto", display: "flex", gap: 10, minHeight: 320, overflow: "hidden" }}>
 
             {/* Hidden file input */}
             <input ref={fileInputRef} type="file" multiple accept="image/*" style={{ display: "none" }}
