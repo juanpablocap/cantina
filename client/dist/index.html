@@ -3443,7 +3443,7 @@ window.__App = function CantinaFull() {
         const actionDesc = pinModal.action === "eliminar" ? `¿Eliminar a ${cli?.nombre} ${cli?.apellido}?`
           : pinModal.action === "cancelar" ? `¿Cancelar pedido #${String(pedidos.find(p => p.id === pinModal.pedidoId)?.numero || 0).padStart(3, "0")}? Se devuelve el stock.`
           : pinModal.action === "eliminarUsuario" ? `¿Eliminar usuario ${usuarios.find(u => u.id === pinModal.userId)?.nombre}?`
-          : pinModal.action === "resetProduccion" ? "Borra productos, categorías, clientes, ventas, cierres y backups. Se hace backup de seguridad automático. Esta acción no se puede deshacer."
+          : pinModal.action === "resetProduccion" ? "Borra productos, categorías, clientes, ventas, cierres y backups. Las imágenes del TV se conservan. Se hace backup de seguridad automático."
           : `Registrar pago de $${pinModal.pagoMonto?.toLocaleString()} a ${cli?.nombre} ${cli?.apellido}`;
 
         return (

@@ -235,15 +235,7 @@ app.post('/api/system/reset-produccion', async (req, res) => {
     await prisma.$executeRawUnsafe(`TRUNCATE TABLE "Categoria" RESTART IDENTITY CASCADE`);
     await prisma.$executeRawUnsafe(`TRUNCATE TABLE "CarouselImage" RESTART IDENTITY CASCADE`);
 
-    // 3. Borrar imágenes del carrusel
-    const imagesDir = path.join(__dirname, 'images');
-    if (fs.existsSync(imagesDir)) {
-      fs.readdirSync(imagesDir)
-        .filter(f => !f.startsWith('.'))
-        .forEach(f => fs.unlinkSync(path.join(imagesDir, f)));
-    }
-
-    // 4. Borrar backups viejos (conservar solo el pre-reset recién creado)
+    // 3. Borrar backups viejos (conservar solo el pre-reset recién creado)
     fs.readdirSync(backupDir)
       .filter(f => f.endsWith('.sql') && f !== filename)
       .forEach(f => fs.unlinkSync(path.join(backupDir, f)));
