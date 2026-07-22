@@ -242,7 +242,8 @@ app.post('/api/system/reset-produccion', async (req, res) => {
 
     res.json({ ok: true, backup: filename });
   } catch(e) {
-    res.status(500).json({ error: e.message });
+    console.error('[reset-produccion]', e.message);
+    res.json({ ok: false, error: e.message });
   }
 });
 
