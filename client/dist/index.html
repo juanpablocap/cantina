@@ -1846,18 +1846,17 @@ window.__App = function CantinaFull() {
                 {/* Mozo assignment */}
                 <div style={{ padding: "6px 14px", borderBottom: `1px solid ${S.border}`, display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", flexShrink: 0 }}>
                   <span style={{ fontSize: 10, fontWeight: 800, color: S.muted }}>👤</span>
-                  <button onClick={() => asignarMozo(sel, null)} title="Sin mozo"
-                    style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${!mesasMozos[sel] ? S.accent : S.border}`, background: !mesasMozos[sel] ? S.accent : "transparent", color: !mesasMozos[sel] ? "#fff" : S.muted, fontSize: 11, fontWeight: 800, cursor: "pointer", lineHeight: 1 }}>—</button>
-                  {usuarios.filter(u => u.rol === 'mozo' || u.rol === 'cajero').map(u => {
+                  <span onClick={() => asignarMozo(sel, null)} title="Sin mozo"
+                    style={{ padding: "4px 8px", borderRadius: 8, border: `1px solid ${!mesasMozos[sel] ? S.accent : S.border}`, background: !mesasMozos[sel] ? S.accent : "transparent", color: !mesasMozos[sel] ? "#fff" : S.muted, fontSize: 10, fontWeight: 800, cursor: "pointer" }}>—</span>
+                  {usuarios.filter(u => (u.rol === 'mozo' || u.rol === 'cajero') && u.nombre !== 'Mozo C').map(u => {
                     const isAssigned = mesasMozos[sel] === u.id;
                     return (
-                      <button key={u.id} onClick={() => asignarMozo(sel, u.id)} title={u.nombre}
-                        style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${isAssigned ? S.accent : S.border}`, background: isAssigned ? S.accent : S.bg, color: isAssigned ? "#fff" : S.text, fontSize: 11, fontWeight: 800, cursor: "pointer", lineHeight: 1 }}>
-                        {u.nombre[0].toUpperCase()}
-                      </button>
+                      <span key={u.id} onClick={() => asignarMozo(sel, u.id)}
+                        style={{ padding: "4px 9px", borderRadius: 8, border: `1px solid ${isAssigned ? S.accent : S.border}`, background: isAssigned ? S.accent : S.bg, color: isAssigned ? "#fff" : S.text, fontSize: 10, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
+                        {u.nombre}
+                      </span>
                     );
                   })}
-                  {mesasMozos[sel] && <span style={{ fontSize: 11, color: S.info, fontWeight: 700, marginLeft: 2 }}>{usuarios.find(u => u.id === mesasMozos[sel])?.nombre}</span>}
                 </div>
 
                 {selActiva ? (
@@ -4405,6 +4404,9 @@ window.__App = function CantinaFull() {
           onCobrar={cobrarPedido}
           onClose={() => setCobrandoPedido(null)}
           clientes={clientes}
+          usuarios={usuarios}
+          mesasMozos={mesasMozos}
+          asignarMozo={asignarMozo}
           S={S}
         />
       )}
@@ -4415,7 +4417,7 @@ window.__App = function CantinaFull() {
 // ========================================
 // COBRAR MODAL
 // ========================================
-function CobrarModal({ pedido, onCobrar, onClose, clientes, S }) {
+function CobrarModal({ pedido, onCobrar, onClose, clientes, usuarios, mesasMozos, asignarMozo, S }) {
   const itemNombre = (i) => i.nombre || (i.producto && i.producto.nombre) || "?";
   const [metodo, setMetodo] = useState("efectivo");
   const [montoRecibido, setMontoRecibido] = useState("");
@@ -4504,6 +4506,24 @@ function CobrarModal({ pedido, onCobrar, onClose, clientes, S }) {
             <span key={idx}>{it.cantidad}x {itemNombre(it)}{idx < pedido.items.length - 1 ? " · " : ""}</span>
           ))}
         </div>
+
+        {/* Mozo pills — solo para pedidos de mesa */}
+        {pedido.tipo === "mesa" && usuarios && (
+          <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", marginBottom: 10 }}>
+            <span style={{ fontSize: 10, fontWeight: 800, color: S.muted }}>👤</span>
+            <span onClick={() => asignarMozo(pedido.mesa_numero, null)}
+              style={{ padding: "4px 8px", borderRadius: 8, border: `1px solid ${!mesasMozos[pedido.mesa_numero] ? S.accent : S.border}`, background: !mesasMozos[pedido.mesa_numero] ? S.accent : "transparent", color: !mesasMozos[pedido.mesa_numero] ? "#fff" : S.muted, fontSize: 10, fontWeight: 800, cursor: "pointer" }}>—</span>
+            {usuarios.filter(u => (u.rol === 'mozo' || u.rol === 'cajero') && u.nombre !== 'Mozo C').map(u => {
+              const isAssigned = mesasMozos[pedido.mesa_numero] === u.id;
+              return (
+                <span key={u.id} onClick={() => asignarMozo(pedido.mesa_numero, u.id)}
+                  style={{ padding: "4px 9px", borderRadius: 8, border: `1px solid ${isAssigned ? S.accent : S.border}`, background: isAssigned ? S.accent : S.bg, color: isAssigned ? "#fff" : S.text, fontSize: 10, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  {u.nombre}
+                </span>
+              );
+            })}
+          </div>
+        )}
 
         {/* Discount */}
         <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 10 }}>

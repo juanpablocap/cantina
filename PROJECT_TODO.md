@@ -62,6 +62,9 @@ Auditoría completa del código real ejecutada antes de la entrega al cliente. S
 * [x] Prefix de mozo en número de pedido: A001 / B001 en vez de #001 cuando la mesa tiene mozo asignado
 * [x] Panel de detalle de mesa: selector de mozo por iniciales (persistido en servidor, sincroniza cocina)
 * [x] cocina.html: muestra initial del mozo en el número grande de cada tarjeta, sincroniza cada 30s
+* [x] Selector de mozo en mesa: cambió de botones circulares con inicial a pills con nombre completo
+* [x] Mozo C oculto en selector de mesa y en modal de cobro (filtro por nombre en UI — usuario existe en DB pero no aparece)
+* [x] Modal de cobro: muestra pills de mozo para pedidos de mesa (misma lógica que panel de mesas, permite asignar/cambiar mozo al cobrar desde Caja)
 
 ## PRIORIDAD ALTA — Estabilidad y Recovery
 
