@@ -935,7 +935,13 @@ window.__App = function CantinaFull() {
 
   const liberarMesa = async (num) => {
     if (!window.confirm(`¿Liberar mesa ${num}? La mesa quedará libre para nuevos clientes.`)) return;
-    const result = await apiFetch(`/mesas/${num}/liberar`, { method: 'POST' });
+    let result = null;
+    try {
+      const res = await fetch(API + `/mesas/${num}/liberar`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+      const body = await res.json();
+      if (!res.ok) { showMsg(`❌ ${body.error || 'Error al liberar mesa'}`); return; }
+      result = body;
+    } catch(e) { showMsg("❌ Error al liberar mesa"); return; }
     if (!result) { showMsg("❌ Error al liberar mesa"); return; }
     setPedidos(prev => prev.map(p => p.tipo === 'mesa' && Number(p.mesa_numero) === num ? { ...p, mesa_liberada: true } : p));
     setMesasMozos(prev => { const next = { ...prev }; delete next[num]; return next; });
@@ -1647,9 +1653,8 @@ window.__App = function CantinaFull() {
         const getMesaStatus = (num) => {
           const peds = pedidosMesa(num);
           if (peds.length === 0) return 'libre';
-          const allEntregado = peds.every(p => p.estado === 'entregado');
           const allCobrado = peds.every(p => p.cobrado);
-          if (allEntregado && allCobrado) return 'lista_liberar';
+          if (allCobrado) return 'lista_liberar';
           const firstMs = Math.min(...peds.map(p => new Date(p.createdAt).getTime()));
           if ((Date.now() - firstMs) / 60000 >= 30) return 'urgente';
           if (peds.some(p => p.estado === 'entregado' && !p.cobrado)) return 'por_cobrar';
@@ -1929,7 +1934,7 @@ window.__App = function CantinaFull() {
                             </button>
                           )}
                         </div>
-                        {selPeds.length > 0 && selPeds.every(p => p.cobrado && p.estado === 'entregado') && (
+                        {selPeds.length > 0 && selPeds.every(p => p.cobrado) && (
                           <button onClick={() => liberarMesa(sel)} style={{ width: "100%", padding: "10px 0", borderRadius: 8, border: "none", background: S.info, color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
                             🚪 Liberar mesa
                           </button>

@@ -533,8 +533,7 @@ app.post('/api/pedidos/:id/cobrar', async (req, res) => {
       const totalConDescuento = descuento_pct
         ? Math.round(existing.total * (1 - descuento_pct / 100))
         : existing.total;
-      const data = { cobrado: true, metodo_pago, total: totalConDescuento };
-      if (existing.tipo !== 'mesa') data.estado = 'entregado';
+      const data = { cobrado: true, metodo_pago, total: totalConDescuento, estado: 'entregado' };
       if (referencia) data.referencia = referencia;
       if (descuento_pct) data.descuento_pct = descuento_pct;
       if (cliente_id) data.cliente_id = cliente_id;
@@ -585,8 +584,8 @@ app.post('/api/mesas/:num/liberar', async (req, res) => {
       where: { mesa_numero: num, mesa_liberada: false, estado: { not: 'cancelado' } }
     });
     if (activos.length === 0) return res.status(404).json({ error: 'No hay pedidos activos para esta mesa' });
-    const allReady = activos.every(p => p.cobrado && p.estado === 'entregado');
-    if (!allReady) return res.status(409).json({ error: 'Hay pedidos sin entregar o sin cobrar' });
+    const allReady = activos.every(p => p.cobrado);
+    if (!allReady) return res.status(409).json({ error: 'Hay pedidos sin cobrar en esta mesa' });
     await prisma.pedido.updateMany({
       where: { mesa_numero: num, mesa_liberada: false },
       data: { mesa_liberada: true }
