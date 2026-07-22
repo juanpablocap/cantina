@@ -108,7 +108,9 @@ function buildTicketBuffer(pedido) {
   const fechaHora = `${fp.day}/${fp.month}/${fp.year} ${fp.hour}:${fp.minute}`;
 
   const tipo      = pedido.tipo === 'mesa' ? `Mesa ${pedido.mesa_numero}` : 'Barra';
-  const numero    = String(pedido.numero || 0).padStart(3, '0');
+  const _nums     = pedido._numeros;
+  const numero    = _nums ? _nums.map(n => String(n).padStart(3,'0')).join('+') : String(pedido.numero || 0).padStart(3, '0');
+  const pedidoKey = _nums && _nums.length > 1 ? 'PEDIDOS' : 'PEDIDO';
   const ticketId  = String(pedido.id || 0).padStart(4, '0');
   const mozoRaw   = pedido._mozo_nombre || '';
 
@@ -120,7 +122,7 @@ function buildTicketBuffer(pedido) {
   parts.push(txt('CANTINA NyG\n'));
   parts.push(C.size_normal, C.bold_off);
   parts.push(txt('Club Natacion y Gimnasia\n'));
-  parts.push(txt('San Miguel de Tucuman\n'));
+  parts.push(txt('Primero el club, siempre el club\n'));
   parts.push(rule('='));
 
   // ── DATOS DE LA VENTA ───────────────────────────────────
@@ -131,7 +133,7 @@ function buildTicketBuffer(pedido) {
   // Mozo (si aplica)
   if (mozoRaw) parts.push(txt(`Mozo: ${trunc(mozoRaw, WIDTH - 6)}\n`));
   // Fila 2: mesa grande izq — pedido# bold der (doble alto)
-  const pedidoLabel = `PEDIDO #${numero}`;
+  const pedidoLabel = `${pedidoKey} #${numero}`;
   parts.push(rule('.'));
   parts.push(C.size_dbl_h, C.bold_on);
   parts.push(txt(pad(tipo, WIDTH - pedidoLabel.length) + pedidoLabel + '\n'));

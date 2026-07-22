@@ -600,6 +600,86 @@ app.post('/api/mesas/:num/liberar', async (req, res) => {
 });
 
 // ============================================
+// COBRAR MESA (todos los pedidos, un solo ticket)
+// ============================================
+app.post('/api/mesas/:num/cobrar', async (req, res) => {
+  const num = Number(req.params.num);
+  if (!num) return res.status(400).json({ error: 'Número de mesa inválido' });
+  const { metodo_pago, referencia, cliente_id, descuento_pct } = req.body;
+  const metodosValidos = ['efectivo', 'transferencia', 'cuenta_corriente'];
+  if (!metodosValidos.includes(metodo_pago)) return res.status(400).json({ error: 'metodo_pago inválido' });
+
+  try {
+    const cobrados = await prisma.$transaction(async (tx) => {
+      const sinCobrar = await tx.pedido.findMany({
+        where: { mesa_numero: num, cobrado: false, estado: { not: 'cancelado' }, mesa_liberada: false },
+        include: { items: { include: { producto: true } }, cliente: true }
+      });
+      if (sinCobrar.length === 0) throw Object.assign(new Error('No hay pedidos sin cobrar en esta mesa'), { status: 404 });
+
+      const resultado = [];
+      for (const p of sinCobrar) {
+        const totalConDescuento = descuento_pct ? Math.round(p.total * (1 - descuento_pct / 100)) : p.total;
+        const data = { cobrado: true, metodo_pago, total: totalConDescuento, estado: 'entregado' };
+        if (referencia) data.referencia = referencia;
+        if (descuento_pct) data.descuento_pct = descuento_pct;
+        if (cliente_id) data.cliente_id = cliente_id;
+        const updated = await tx.pedido.update({
+          where: { id: p.id, cobrado: false },
+          data,
+          include: { items: { include: { producto: true } }, cliente: true }
+        }).catch(e => {
+          if (e.code === 'P2025') throw Object.assign(new Error('Pedido ya cobrado'), { status: 409 });
+          throw e;
+        });
+        resultado.push(updated);
+      }
+
+      if (metodo_pago === 'cuenta_corriente' && cliente_id) {
+        const totalMesa = resultado.reduce((s, p) => s + p.total, 0);
+        await tx.cliente.update({ where: { id: cliente_id }, data: { saldo: { increment: totalMesa } } });
+      }
+      return resultado;
+    });
+
+    for (const p of cobrados) io.emit('pedido-actualizado', p);
+
+    // Un solo ticket combinado
+    ;(async () => {
+      let mozo_nombre = null;
+      const mozo_id = mesasMozos[num];
+      if (mozo_id) {
+        try {
+          const u = await prisma.usuario.findUnique({ where: { id: mozo_id }, select: { nombre: true } });
+          mozo_nombre = u?.nombre || null;
+        } catch {}
+      }
+      const totalMesa = cobrados.reduce((s, p) => s + p.total, 0);
+      const cliente   = cobrados.find(p => p.cliente)?.cliente || null;
+      const mesaTicket = {
+        createdAt: new Date(),
+        tipo: 'mesa',
+        mesa_numero: num,
+        _numeros: cobrados.map(p => p.numero),
+        id: cobrados[0].id,
+        _mozo_nombre: mozo_nombre,
+        items: cobrados.flatMap(p => p.items),
+        total: totalMesa,
+        metodo_pago,
+        cliente,
+        descuento_pct: descuento_pct || null,
+      };
+      printer.printTicket(mesaTicket).catch(err => console.error('[printer] cobro-mesa fail:', err.message));
+    })();
+
+    res.json({ ok: true, pedidos: cobrados });
+  } catch(e) {
+    console.error('[mesas/cobrar] error:', e);
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
+// ============================================
 // PRINTER endpoints
 // ============================================
 app.post('/api/print/:pedidoId', async (req, res) => {
@@ -855,7 +935,7 @@ app.get('/api/pedidos/:id/ticket', async (req, res) => {
     ticket += '==========================================\n';
     ticket += '             CANTINA NyG\n';
     ticket += '      Club Natacion y Gimnasia\n';
-    ticket += '      San Miguel de Tucuman\n';
+    ticket += '  Primero el club, siempre el club\n';
     ticket += '==========================================\n';
     ticket += `${dd}/${mmes}/${yy} ${hh}:${min}`.padEnd(W - (`Ticket #${String(pedido.id).padStart(4,'0')}`).length) + `Ticket #${String(pedido.id).padStart(4,'0')}` + '\n';
     ticket += '..........................................\n';

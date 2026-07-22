@@ -851,47 +851,41 @@ window.__App = function CantinaFull() {
 
   // Cobrar pedido
   const cobrarPedido = async (pedidoId, metodo, montoRecibido, referencia, clienteId, descPct) => {
-    // Handle consolidated mesa cobro (multiple pedidos)
-    const pedidosACobrar = [];
     const pedOriginal = pedidos.find(p => p.id === pedidoId);
-    
-    if (pedOriginal && pedOriginal.tipo === "mesa" && pedOriginal.mesa_numero) {
-      // Cobrar todos los pedidos de esa mesa
-      const mesaPeds = pedidos.filter(p => p.tipo === "mesa" && Number(p.mesa_numero) === Number(pedOriginal.mesa_numero) && !p.cobrado && p.estado !== 'cancelado');
-      mesaPeds.forEach(p => pedidosACobrar.push(p.id));
-    } else {
-      pedidosACobrar.push(pedidoId);
-    }
+    const body = { metodo_pago: metodo };
+    if (referencia) body.referencia = referencia;
+    if (clienteId) body.cliente_id = clienteId;
+    if (descPct) body.descuento_pct = Number(descPct);
 
-    let allOk = true;
-    for (const pid of pedidosACobrar) {
-      const body = { metodo_pago: metodo };
-      if (referencia) body.referencia = referencia;
-      if (clienteId) body.cliente_id = clienteId;
-      if (descPct) body.descuento_pct = Number(descPct);
-      
-      const result = await apiFetch(`/pedidos/${pid}/cobrar`, { method: 'POST', body });
-      if (!result) allOk = false;
-    }
-
-    if (allOk) {
-      setPedidos(prev => prev.map(p => pedidosACobrar.includes(p.id) ? { ...p, cobrado: true, metodo_pago: metodo, cliente_id: clienteId, ...(pedOriginal?.tipo !== 'mesa' ? { estado: "entregado" } : {}) } : p));
-      const totalCobrado = pedidosACobrar.reduce((s, pid) => { const p = pedidos.find(x => x.id === pid); return s + (p ? p.total : 0); }, 0);
-      setCajaMovimientos(prev => [...prev, {
-        tipo: "venta", metodo, monto: totalCobrado, pedido_num: pedOriginal?.numero || 0,
-        referencia: referencia || null, cliente_id: clienteId || null, ts: new Date().toISOString(),
-      }]);
-      if (metodo === "cuenta_corriente" && clienteId) {
-        setClientes(prev => prev.map(c => c.id === clienteId ? { ...c, saldo: c.saldo + totalCobrado } : c));
-      }
+    if (pedOriginal?.tipo === "mesa" && pedOriginal.mesa_numero) {
+      // Mesa: endpoint consolidado → un solo ticket para todos los pedidos
+      const result = await apiFetch(`/mesas/${pedOriginal.mesa_numero}/cobrar`, { method: 'POST', body });
+      if (!result || !result.ok) { showMsg("❌ Error al cobrar mesa"); return; }
+      const ids = result.pedidos.map(p => p.id);
+      const totalCobrado = result.pedidos.reduce((s, p) => s + p.total, 0);
+      setPedidos(prev => prev.map(p => ids.includes(p.id) ? { ...p, cobrado: true, metodo_pago: metodo, estado: 'entregado', cliente_id: clienteId } : p));
+      setCajaMovimientos(prev => [...prev, { tipo: "venta", metodo, monto: totalCobrado, pedido_num: pedOriginal.numero || 0, referencia: referencia || null, cliente_id: clienteId || null, ts: new Date().toISOString() }]);
+      if (metodo === "cuenta_corriente" && clienteId) setClientes(prev => prev.map(c => c.id === clienteId ? { ...c, saldo: c.saldo + totalCobrado } : c));
       setCobrandoPedido(null);
       setTicketVisible(pedOriginal);
       playCajaCobroSound();
       setTimeout(() => setTicketVisible(null), 1000);
       showMsg("💰 Cobrado $" + totalCobrado.toLocaleString() + " con " + (metodo === "efectivo" ? "efectivo" : metodo === "transferencia" ? "transferencia" : "fiado"));
-    } else {
-      showMsg("❌ Error al cobrar");
+      return;
     }
+
+    // Pedido individual (barra / llevar)
+    const result = await apiFetch(`/pedidos/${pedidoId}/cobrar`, { method: 'POST', body });
+    if (!result) { showMsg("❌ Error al cobrar"); return; }
+    setPedidos(prev => prev.map(p => p.id === pedidoId ? { ...p, cobrado: true, metodo_pago: metodo, estado: 'entregado', cliente_id: clienteId } : p));
+    const totalCobrado = pedOriginal?.total || 0;
+    setCajaMovimientos(prev => [...prev, { tipo: "venta", metodo, monto: totalCobrado, pedido_num: pedOriginal?.numero || 0, referencia: referencia || null, cliente_id: clienteId || null, ts: new Date().toISOString() }]);
+    if (metodo === "cuenta_corriente" && clienteId) setClientes(prev => prev.map(c => c.id === clienteId ? { ...c, saldo: c.saldo + totalCobrado } : c));
+    setCobrandoPedido(null);
+    setTicketVisible(pedOriginal);
+    playCajaCobroSound();
+    setTimeout(() => setTicketVisible(null), 1000);
+    showMsg("💰 Cobrado $" + totalCobrado.toLocaleString() + " con " + (metodo === "efectivo" ? "efectivo" : metodo === "transferencia" ? "transferencia" : "fiado"));
   };
 
   const marcarEntregado = async (id) => {
