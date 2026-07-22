@@ -9,9 +9,9 @@ const { execFile } = require('child_process');
 const iconv = require('iconv-lite');
 
 const CANDIDATES = ['/dev/usb/lp0', '/dev/usb/lp1', '/dev/usb/lp2', '/dev/lp0', '/dev/lp1'];
-const WIDTH = 36;
+const WIDTH = 42;
 const CODEPAGE = 'cp858';
-const NAME_MAX = 20;   // caracteres máximos del nombre de un item antes de truncar
+const NAME_MAX = 24;   // caracteres máximos del nombre de un item antes de truncar
 
 const ESC = 0x1B, GS = 0x1D;
 const C = {

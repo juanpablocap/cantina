@@ -794,37 +794,37 @@ app.get('/api/pedidos/:id/ticket', async (req, res) => {
     const tipo = pedido.tipo === 'mesa' ? `Mesa ${pedido.mesa_numero}` : 'Barra';
     const numero = String(pedido.numero).padStart(3,'0');
 
+    const W = 42;
     let ticket = '';
-    ticket += '====================================\n';
-    ticket += '           CANTINA NyG\n';
-    ticket += '    Club Natacion y Gimnasia\n';
-    ticket += '    San Miguel de Tucuman\n';
-    ticket += '====================================\n';
-    ticket += `${dd}/${mmes}/${yy} ${hh}:${min}`.padEnd(36 - tipo.length) + tipo + '\n';
-    ticket += `Ticket #${String(pedido.id).padStart(4,'0')}\n`;
-    ticket += '....................................\n';
-    ticket += `      PEDIDO #${numero}\n`;
-    ticket += '------------------------------------\n';
-    ticket += 'CANT DESCRIPCION          TOTAL\n';
-    ticket += '------------------------------------\n';
+    ticket += '==========================================\n';
+    ticket += '             CANTINA NyG\n';
+    ticket += '      Club Natacion y Gimnasia\n';
+    ticket += '      San Miguel de Tucuman\n';
+    ticket += '==========================================\n';
+    ticket += `${dd}/${mmes}/${yy} ${hh}:${min}`.padEnd(W - (`Ticket #${String(pedido.id).padStart(4,'0')}`).length) + `Ticket #${String(pedido.id).padStart(4,'0')}` + '\n';
+    ticket += '..........................................\n';
+    ticket += `${tipo}`.padEnd(W - (`PEDIDO #${numero}`).length) + `PEDIDO #${numero}` + '\n';
+    ticket += '------------------------------------------\n';
+    ticket += 'CANT DESCRIPCION               TOTAL\n';
+    ticket += '------------------------------------------\n';
 
     for (const item of pedido.items) {
-      const nombre = (item.producto?.nombre || '?').slice(0, 20);
+      const nombre = (item.producto?.nombre || '?').slice(0, 24);
       const subtotal = item.cantidad * item.precio;
-      const label = `${item.cantidad}x ${nombre}`.slice(0, 27);
-      ticket += label.padEnd(27) + `$${subtotal.toLocaleString('es-AR')}`.padStart(9) + '\n';
+      const label = `${item.cantidad}x ${nombre}`.slice(0, 33);
+      ticket += label.padEnd(33) + `$${subtotal.toLocaleString('es-AR')}`.padStart(9) + '\n';
       if (item.cantidad > 1) ticket += `      $${item.precio.toLocaleString('es-AR')} c/u\n`;
       if (item.observaciones) ticket += `   >> ${item.observaciones}\n`;
     }
 
-    ticket += '------------------------------------\n';
+    ticket += '------------------------------------------\n';
     if (pedido.descuento_pct) {
       const totalAntes = Math.round(pedido.total / (1 - pedido.descuento_pct / 100));
-      ticket += 'Subtotal'.padEnd(27) + `$${totalAntes.toLocaleString('es-AR')}`.padStart(9) + '\n';
-      ticket += `Desc. ${pedido.descuento_pct}%`.padEnd(27) + `-$${(totalAntes - pedido.total).toLocaleString('es-AR')}`.padStart(9) + '\n';
+      ticket += 'Subtotal'.padEnd(33) + `$${totalAntes.toLocaleString('es-AR')}`.padStart(9) + '\n';
+      ticket += `Desc. ${pedido.descuento_pct}%`.padEnd(33) + `-$${(totalAntes - pedido.total).toLocaleString('es-AR')}`.padStart(9) + '\n';
     }
-    ticket += '....................................\n';
-    ticket += 'TOTAL'.padEnd(27) + `$${pedido.total.toLocaleString('es-AR')}`.padStart(9) + '\n';
+    ticket += '..........................................\n';
+    ticket += 'TOTAL'.padEnd(33) + `$${pedido.total.toLocaleString('es-AR')}`.padStart(9) + '\n';
 
     if (pedido.cobrado) {
       const met = { efectivo: 'Efectivo', transferencia: 'Transferencia', cuenta_corriente: 'Cuenta corriente' }[pedido.metodo_pago] || pedido.metodo_pago;
@@ -832,10 +832,10 @@ app.get('/api/pedidos/:id/ticket', async (req, res) => {
       if (pedido.cliente) ticket += `A nombre de: ${pedido.cliente.nombre} ${pedido.cliente.apellido || ''}\n`;
     }
 
-    ticket += '====================================\n';
-    ticket += '     ¡Gracias por su visita!\n';
-    ticket += '          @cantinanyg\n';
-    ticket += '====================================\n';
+    ticket += '==========================================\n';
+    ticket += '       ¡Gracias por su visita!\n';
+    ticket += '            @cantinanyg\n';
+    ticket += '==========================================\n';
 
     res.json({ ticket, pedido });
   } catch(e) {
