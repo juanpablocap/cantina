@@ -7,9 +7,9 @@ Incluye: impresora térmica para tickets, TV en el salón con carrusel de imáge
 
 ---
 
-## Estado actual del sistema (junio 2026)
+## Estado actual del sistema (julio 2026)
 
-El sistema está **en producción, estable y documentado**. Todos los servicios levantan solos tras un reboot. No hay reescrituras pendientes — se trabaja en mejoras incrementales.
+El sistema está **auditado, corregido y listo para entrega al cliente**. Todos los servicios levantan solos tras un reboot. Se realizó una auditoría completa de código pre-entrega con 9 bugs críticos/altos corregidos.
 
 ### Completado
 
@@ -22,20 +22,25 @@ El sistema está **en producción, estable y documentado**. Todos los servicios 
 - TV promo carousel: `promo.html` fullscreen + API completa (upload/delete imágenes)
 - Backups con retención de 30 días; scripts de mantenimiento completos
 - Documentación completa: ARCHITECTURE, DEPLOYMENT, RECOVERY, OPERACION, SERVER_INFO, MASTER_CONTEXT
-- Código demo eliminado (botón "Simular pedido autoservicio" removido)
-- **Pantalla Caja con 3 solapas:** Hoy (cierre normal) · Historial (últimos 30 cierres con Ver/Descargar) · Estadísticas (gráfico torta, rankings, métricas, selector de rango)
-- **Productos sin stock:** permanecen activos y clickeables; stock puede ser negativo; badge "SIN STOCK" en la card
-- **Validación cantidad:** `POST /api/pedidos` rechaza `cantidad ≤ 0` o no entero — evita pedidos inválidos
-- **Descuento real en cobro:** `POST /api/pedidos/:id/cobrar` calcula y persiste el `total` post-descuento; la cuenta corriente incrementa el monto real cobrado (no el bruto)
-- **Cierre de caja persistente:** `CierreCaja.details` (JSON) guarda los productos vendidos para consulta futura desde Historial
-- **Nuevas rutas:** `GET /api/cierres/:id`, `GET /api/estadisticas?range=...`, `GET /api/pedidos/por-fecha?fecha=...`
+- **Impresora térmica ESC/POS** integrada (`printer.js`): auto-imprime al cobrar, ticket rediseñado (CANTINA NyG, 42 chars, timezone AR)
+- **Pantalla Caja con 3 solapas:** Hoy · Historial (últimos 30 cierres con Ver/Descargar) · Estadísticas (gráfico torta, rankings, métricas, selector de rango)
+- **Auditoría pre-entrega:** 9 bugs críticos/altos corregidos — ver `PROJECT_TODO.md` para detalle completo
 
-### Pendiente (requiere acceso físico)
+### Robustez del backend (post-auditoría)
 
-- Kiosk Chromium en tablets: fullscreen, reconexión, autorestart
-- Guía visual con capturas de pantalla
-- Restore completo desde cero (probar)
-- Revisión usuarios y permisos PostgreSQL
+- **Restart/shutdown**: responden antes de ejecutar el comando; HTTP 500 real si el sistema falla en lugar de siempre reportar éxito
+- **Cobro atómico**: `UPDATE WHERE cobrado=false` previene doble cobro concurrente (protege cuenta corriente)
+- **Timezone Argentina**: todos los cálculos de "hoy" y timestamps usan `midnightAR()` con `America/Argentina/Tucuman`, no UTC del servidor
+- **Estados protegidos**: `PUT /api/pedidos/:id` no puede poner estado `cancelado` (requiere `/cancelar` que restaura stock)
+- **Socket `cambiar-estado`**: whitelist de estados válidos + emite pedido con items completos
+- **pg_dump**: credenciales explícitas, no depende de pg_hba del sistema
+- **`POST /api/cierres`**: validación de campos requeridos + tipado numérico
+
+### Pendiente / deuda conocida
+
+- Tests: no hay cobertura (stack sugerido: Vitest + Supertest). No es bloqueante para entrega.
+- Kiosk Chromium en tablets: fullscreen, reconexión, autorestart (requiere acceso físico)
+- API sin autenticación: aceptable para LAN cerrada, no agregar endpoints sensibles
 
 ---
 

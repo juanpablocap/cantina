@@ -17,7 +17,7 @@ Sistema POS touchscreen para cantina corporativa argentina. Corre 100% en LAN, s
 
 | Archivo | Descripción |
 |---|---|
-| `server.js` | Backend completo (~660 líneas) — Express + Socket.io + Prisma. Un solo archivo. |
+| `server.js` | Backend completo (~900 líneas) — Express + Socket.io + Prisma. Un solo archivo. |
 | `client/dist/index.html` | POS principal (~3600 líneas) — caja, pedidos, mesas, admin, clientes, sistema |
 | `client/dist/cocina.html` | Display para la cocina — estados de pedidos en tiempo real |
 | `client/dist/autoservicio.html` | Kiosko self-service para clientes |
@@ -49,13 +49,22 @@ La navegación es bottom bar fija (Modern POS v2): Venta / Pedidos / Mesas / Caj
 | `OPERACION.md` | Flujos de uso desde el punto de vista del operador |
 | `RECOVERY.md` | Troubleshooting, cómo restaurar desde cero |
 
-## Riesgos críticos vigentes
+## Riesgos vigentes
 
-1. **Cola autoservicio en memoria** — `pendingAutoservicio` en server.js se pierde al reiniciar el backend. No persiste en DB.
+1. **Cola autoservicio en memoria** — `pendingAutoservicio` en server.js se pierde al reiniciar el backend. No persiste en DB. IDs basados en `Date.now()`, no únicos bajo carga extrema. Aceptable para el volumen esperado (cajero aprueba manualmente antes de procesar).
 2. **Sin autenticación en la API** — cualquier dispositivo en la LAN puede leer y modificar datos. Aceptable para LAN cerrada, pero no agregar endpoints sensibles sin considerar esto.
 3. **Kiosk Chromium no configurado** — las tablets requieren configuración física (fullscreen, autorestart, reconexión).
-4. **Impresora térmica no integrada** — `escpos`/`escpos-usb` están en dependencies pero sin implementar. El ticket se genera como texto plano en `GET /api/pedidos/:id/ticket`.
+4. **Sin tests automatizados** — no hay cobertura de tests. Flujos críticos validados manualmente. Stack sugerido: Vitest + Supertest.
 5. **`client/src/App.jsx` es el template Vite por defecto** — `npm run build` en `client/` sobreescribiría `client/dist/` con el template. Los 4 HTMLs reales son handcrafted, no se buildean.
+
+## Bugs críticos corregidos (auditoría julio 2026)
+
+No tocar estas áreas sin leer el contexto completo — bugs sutiles que costó encontrar:
+
+- **`POST /api/system/restart`**: responde `{ ok:true, restarting:true }` ANTES de ejecutar el reinicio. El proceso muere y no puede responder después. Cualquier cambio debe preservar este orden.
+- **`POST /api/pedidos/:id/cobrar`**: usa `UPDATE WHERE cobrado=false` (guard atómico). No reemplazar por `findUnique` + check manual — hay una race condition documentada con cuenta corriente.
+- **`midnightAR()`**: helper en server.js para calcular medianoche en Argentina. Todos los cálculos de "hoy" deben usar esto, no `new Date(); setHours(0,0,0,0)` que usa UTC del servidor.
+- **`PUT /api/pedidos/:id`**: no acepta `estado='cancelado'` — debe ir por `/cancelar` que restaura stock. No revertir esta restricción.
 
 ## Filosofía
 

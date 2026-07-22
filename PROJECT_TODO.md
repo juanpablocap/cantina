@@ -11,8 +11,31 @@
 * [ ] Primer backup real después del reset: `bash scripts/backup.sh`
 * [ ] Verificar sistema completo antes de entregar: `bash scripts/healthcheck.sh`
 
+## Auditoría pre-entrega (julio 2026)
+
+Auditoría completa del código real ejecutada antes de la entrega al cliente. Se encontraron y corrigieron 9 bugs críticos/altos en `server.js`.
+
+### Corregidos ✅
+
+* [x] **Restart — cliente colgaba hasta timeout** — `POST /api/system/restart` intentaba responder después de matar su propio proceso. Fix: responde `{ ok: true, restarting: true }` antes de ejecutar el reinicio.
+* [x] **Restart — reportaba éxito aunque fallara** — el campo `error` en la respuesta se ignoraba y el status HTTP era siempre 200. Fix: HTTP 500 real si el comando falla.
+* [x] **Shutdown — siempre respondía `ok: true`** — respondía antes de intentar el comando; si `sudo shutdown` fallaba el usuario no se enteraba. Fix: exec con callback real, HTTP 500 si falla.
+* [x] **Race condition cobrar + cuenta corriente** — dos requests simultáneas leían `cobrado: false` y ambas incrementaban `cliente.saldo`, duplicando la deuda. Fix: `UPDATE WHERE cobrado=false` es atómico en PostgreSQL; la segunda TX no encuentra fila y lanza 409.
+* [x] **`PUT /api/pedidos/:id` cancelaba sin restaurar stock** — poner `estado: 'cancelado'` por esta ruta no corría la lógica de devolución de stock. Fix: estados válidos restringidos a `[pendiente, preparando, listo, entregado]`; cancelar debe ir por `/cancelar`.
+* [x] **`cambiar-estado` socket sin validación** — aceptaba cualquier string como estado; el `pedido-actualizado` emitido no incluía `items`, rompiendo el display de cocina. Fix: whitelist de estados + `include: { items }` en el update.
+* [x] **`today` en UTC** — `setHours(0,0,0,0)` calculaba medianoche UTC (= 21:00 Argentina); pedidos de los últimos 3 servicios del día aparecían en "ayer". Fix: helper `midnightAR()` con `Intl` + timezone `America/Argentina/Tucuman`, aplicado en `GET /api/pedidos`, `POST /api/pedidos` (numeración diaria) y `GET /api/estadisticas`.
+* [x] **`pg_dump` sin credenciales explícitas** — `pg_dump cantina_pos` dependía del pg_hba del sistema; podía fallar silenciosamente en producción. Fix: `PGPASSWORD=... pg_dump -U cantina -h localhost cantina_pos`.
+* [x] **`POST /api/cierres` sin validación** — body crudo del request directo a Prisma; cualquier campo podía llegar nulo o del tipo incorrecto. Fix: validación de campos requeridos + casteo numérico explícito.
+
+### Pendiente / deuda técnica conocida
+
+* [ ] **Tests**: no hay cobertura de tests. Prioridad: flujo cobrar, flujo cancelar, flujo crear pedido. Stack recomendado: Vitest + Supertest. Deuda técnica, no bloqueante para entregar.
+* [ ] **API sin autenticación**: cualquier dispositivo en la LAN puede leer/modificar datos. Aceptable para LAN cerrada; no agregar endpoints sensibles sin considerar esto.
+* [ ] **`pendingAutoservicio` en memoria**: se pierde al reiniciar, IDs no garantizados únicos bajo carga. Aceptable para el volumen esperado.
+
 ## UX / Features recientes (julio 2026)
 
+* [x] Impresora térmica ESC/POS (Epson TM-T88IV): ticket rediseñado — CANTINA NyG, 42 chars, fecha+ticket en fila 1, mesa+pedido# grande en fila 2, timezone Argentina correcta
 * [x] Cierre de caja bloqueado si hay pedidos sin cobrar: muestra modal de advertencia con lista de pedidos pendientes (número, destino, estado, total) — el cierre solo procede cuando todos están cobrados o cancelados
 
 ## UX / Features recientes (junio 2026)
