@@ -525,7 +525,7 @@ app.post('/api/pedidos/:id/cobrar', async (req, res) => {
       const pedido = await tx.pedido.update({
         where: { id: Number(req.params.id) },
         data,
-        include: { items: { include: { producto: true } } }
+        include: { items: { include: { producto: true } }, cliente: true }
       });
       if (metodo_pago === 'cuenta_corriente' && cliente_id) {
         await tx.cliente.update({ where: { id: cliente_id }, data: { saldo: { increment: totalConDescuento } } });
@@ -534,7 +534,17 @@ app.post('/api/pedidos/:id/cobrar', async (req, res) => {
     });
     io.emit('pedido-actualizado', pedido);
     // Imprimir ticket automáticamente (fire-and-forget, no bloquea la respuesta)
-    printer.printTicket(pedido).catch(err => console.error('[printer] cobro fail:', err.message));
+    ;(async () => {
+      let mozo_nombre = null;
+      const mozo_id = mesasMozos[pedido.mesa_numero];
+      if (mozo_id) {
+        try {
+          const u = await prisma.usuario.findUnique({ where: { id: mozo_id }, select: { nombre: true } });
+          mozo_nombre = u?.nombre || null;
+        } catch {}
+      }
+      printer.printTicket({ ...pedido, _mozo_nombre: mozo_nombre }).catch(err => console.error('[printer] cobro fail:', err.message));
+    })();
     res.json(pedido);
   } catch(e) {
     console.error('Cobro error:', e);
@@ -552,7 +562,15 @@ app.post('/api/print/:pedidoId', async (req, res) => {
       include: { items: { include: { producto: true } }, cliente: true }
     });
     if (!pedido) return res.status(404).json({ success: false, error: 'Pedido no encontrado' });
-    const ok = await printer.printTicket(pedido);
+    let mozo_nombre = null;
+    const mozo_id = mesasMozos[pedido.mesa_numero];
+    if (mozo_id) {
+      try {
+        const u = await prisma.usuario.findUnique({ where: { id: mozo_id }, select: { nombre: true } });
+        mozo_nombre = u?.nombre || null;
+      } catch {}
+    }
+    const ok = await printer.printTicket({ ...pedido, _mozo_nombre: mozo_nombre });
     if (ok) res.json({ success: true });
     else res.status(500).json({ success: false, error: 'No se pudo imprimir (revisar conexión/permiso)' });
   } catch(e) {
@@ -767,38 +785,53 @@ app.get('/api/pedidos/:id/ticket', async (req, res) => {
     if (!pedido) return res.status(404).json({ error: 'No encontrado' });
 
     const fecha = new Date(pedido.createdAt);
-    const fechaStr = fecha.toLocaleDateString('es-AR');
-    const horaStr = fecha.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+    const dd = String(fecha.getDate()).padStart(2,'0'), mmes = String(fecha.getMonth()+1).padStart(2,'0'), yy = String(fecha.getFullYear()).slice(-2);
+    const hh = String(fecha.getHours()).padStart(2,'0'), min = String(fecha.getMinutes()).padStart(2,'0');
+    const tipo = pedido.tipo === 'mesa' ? `Mesa ${pedido.mesa_numero}` : 'Barra';
+    const numero = String(pedido.numero).padStart(3,'0');
 
     let ticket = '';
-    ticket += '================================\n';
-    ticket += '         CANTINA POS\n';
-    ticket += '================================\n';
-    ticket += `Fecha: ${fechaStr}  Hora: ${horaStr}\n`;
-    ticket += `Pedido: #${String(pedido.numero).padStart(3, '0')}\n`;
-    ticket += `Tipo: ${pedido.tipo === 'mesa' ? 'Mesa ' + pedido.mesa_numero : 'Barra'}\n`;
-    if (pedido.nombre_cliente) ticket += `Cliente: ${pedido.nombre_cliente}\n`;
-    ticket += '--------------------------------\n';
+    ticket += '========================================\n';
+    ticket += '            CANTINA NyG\n';
+    ticket += '      Club Natacion y Gimnasia\n';
+    ticket += '      San Miguel de Tucuman\n';
+    ticket += '========================================\n';
+    ticket += `${dd}/${mmes}/${yy} ${hh}:${min}`.padEnd(28) + tipo + '\n';
+    ticket += `Ticket #${String(pedido.id).padStart(4,'0')}\n`;
+    ticket += '........................................\n';
+    ticket += `        PEDIDO #${numero}\n`;
+    ticket += '----------------------------------------\n';
+    ticket += 'CANT  DESCRIPCION           SUBTOTAL\n';
+    ticket += '----------------------------------------\n';
 
     for (const item of pedido.items) {
       const nombre = item.producto?.nombre || '?';
       const subtotal = item.cantidad * item.precio;
-      ticket += `${item.cantidad}x ${nombre}\n`;
-      ticket += `   $${item.precio.toLocaleString()} c/u = $${subtotal.toLocaleString()}\n`;
+      const label = `${item.cantidad}x  ${nombre}`.slice(0, 30);
+      ticket += label.padEnd(30) + `$${subtotal.toLocaleString('es-AR')}`.padStart(10) + '\n';
+      if (item.cantidad > 1) ticket += `      $${item.precio.toLocaleString('es-AR')} c/u\n`;
       if (item.observaciones) ticket += `   >> ${item.observaciones}\n`;
     }
 
-    ticket += '--------------------------------\n';
-    ticket += `TOTAL: $${pedido.total.toLocaleString()}\n`;
+    ticket += '----------------------------------------\n';
+    if (pedido.descuento_pct) {
+      const totalAntes = Math.round(pedido.total / (1 - pedido.descuento_pct / 100));
+      ticket += 'Subtotal'.padEnd(30) + `$${totalAntes.toLocaleString('es-AR')}`.padStart(10) + '\n';
+      ticket += `Descuento (${pedido.descuento_pct}%)`.padEnd(30) + `-$${(totalAntes - pedido.total).toLocaleString('es-AR')}`.padStart(10) + '\n';
+    }
+    ticket += '........................................\n';
+    ticket += 'TOTAL'.padEnd(30) + `$${pedido.total.toLocaleString('es-AR')}`.padStart(10) + '\n';
 
     if (pedido.cobrado) {
-      ticket += `Pago: ${pedido.metodo_pago === 'efectivo' ? 'Efectivo' : pedido.metodo_pago === 'transferencia' ? 'Transferencia' : 'Cuenta corriente'}\n`;
-      if (pedido.cliente) ticket += `Cliente: ${pedido.cliente.nombre} ${pedido.cliente.apellido || ''}\n`;
+      const met = { efectivo: 'Efectivo', transferencia: 'Transferencia', cuenta_corriente: 'Cuenta corriente' }[pedido.metodo_pago] || pedido.metodo_pago;
+      ticket += `Pago: ${met}\n`;
+      if (pedido.cliente) ticket += `A nombre de: ${pedido.cliente.nombre} ${pedido.cliente.apellido || ''}\n`;
     }
 
-    ticket += '================================\n';
-    ticket += '       ¡Gracias por su compra!\n';
-    ticket += '================================\n';
+    ticket += '========================================\n';
+    ticket += '       ¡Gracias por su visita!\n';
+    ticket += '            @cantinanyg\n';
+    ticket += '========================================\n';
 
     res.json({ ticket, pedido });
   } catch(e) {

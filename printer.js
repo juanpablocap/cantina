@@ -1,6 +1,6 @@
 // printer.js — Impresora térmica Epson TM-T88 / M244A vía /dev/usb/lp*
 // ESC/POS raw (sin dependencias nativas). Encoding CP858 vía iconv-lite.
-// 80mm = 48 caracteres por línea @ font A.
+// 70mm = 40 caracteres por línea @ font A (con márgenes seguros).
 
 const fs = require('fs');
 const os = require('os');
@@ -9,9 +9,9 @@ const { execFile } = require('child_process');
 const iconv = require('iconv-lite');
 
 const CANDIDATES = ['/dev/usb/lp0', '/dev/usb/lp1', '/dev/usb/lp2', '/dev/lp0', '/dev/lp1'];
-const WIDTH = 48;
+const WIDTH = 40;
 const CODEPAGE = 'cp858';
-const NAME_MAX = 22;   // caracteres máximos del nombre de un item antes de truncar
+const NAME_MAX = 20;   // caracteres máximos del nombre de un item antes de truncar
 
 const ESC = 0x1B, GS = 0x1D;
 const C = {
@@ -99,70 +99,96 @@ function writeToPrinter(buf) {
 
 function buildTicketBuffer(pedido) {
   const fecha = new Date(pedido.createdAt || Date.now());
-  const fechaStr = fecha.toLocaleDateString('es-AR');
-  const horaStr  = fecha.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-  const tipo   = pedido.tipo === 'mesa' ? `Mesa ${pedido.mesa_numero}` : 'Barra';
-  const numero = String(pedido.numero || 0).padStart(3, '0');
+  const dd  = String(fecha.getDate()).padStart(2, '0');
+  const mm  = String(fecha.getMonth() + 1).padStart(2, '0');
+  const yy  = String(fecha.getFullYear()).slice(-2);
+  const hh  = String(fecha.getHours()).padStart(2, '0');
+  const min = String(fecha.getMinutes()).padStart(2, '0');
+  const fechaHora = `${dd}/${mm}/${yy} ${hh}:${min}`;
+
+  const tipo      = pedido.tipo === 'mesa' ? `Mesa ${pedido.mesa_numero}` : 'Barra';
+  const numero    = String(pedido.numero || 0).padStart(3, '0');
+  const ticketId  = String(pedido.id || 0).padStart(4, '0');
+  const mozoRaw   = pedido._mozo_nombre || '';
+  const mozoLabel = mozoRaw ? `Mozo: ${trunc(mozoRaw, 12)}` : '';
 
   const parts = [];
   parts.push(C.init, C.cp858, C.epson_density_max, C.double_strike_on);
 
-  // Header
+  // ── ENCABEZADO ──────────────────────────────────────────
   parts.push(C.align_c, C.size_dbl_wh, C.bold_on);
-  parts.push(txt('CANTINA\n'));
+  parts.push(txt('CANTINA NyG\n'));
   parts.push(C.size_normal, C.bold_off);
-  parts.push(txt('Sistema POS\n'));
+  parts.push(txt('Club Natacion y Gimnasia\n'));
+  parts.push(txt('San Miguel de Tucuman\n'));
   parts.push(rule('='));
 
-  // Meta
+  // ── DATOS DE LA VENTA ───────────────────────────────────
   parts.push(C.align_l);
-  parts.push(txt(`Fecha: ${fechaStr}  Hora: ${horaStr}\n`));
-  parts.push(C.bold_on, txt(`Pedido #${numero}   ${tipo}\n`), C.bold_off);
-  if (pedido.nombre_cliente) parts.push(txt(`Cliente: ${pedido.nombre_cliente}\n`));
+  // Fila 1: fecha/hora izq — mesa der
+  parts.push(txt(pad(fechaHora, WIDTH - tipo.length) + tipo + '\n'));
+  // Fila 2: ticket # izq — mozo der
+  const ticketLabel = `Ticket #${ticketId}`;
+  parts.push(txt(pad(ticketLabel, WIDTH - mozoLabel.length) + mozoLabel + '\n'));
+
+  // Número de pedido — bien visible para cocina/caja
+  parts.push(rule('.'));
+  parts.push(C.align_c, C.size_dbl_h, C.bold_on);
+  parts.push(txt(`PEDIDO #${numero}\n`));
+  parts.push(C.size_normal, C.bold_off, C.align_l);
   parts.push(rule('-'));
 
-  // Items
+  // ── ITEMS ────────────────────────────────────────────────
+  parts.push(txt(pad('CANT  DESCRIPCION', WIDTH - 10) + padLeft('SUBTOTAL', 10) + '\n'));
+  parts.push(rule('-'));
+
   for (const it of (pedido.items || [])) {
     const nombreRaw = it.nombre || (it.producto && it.producto.nombre) || '?';
-    const nombre = trunc(nombreRaw, NAME_MAX);
-    const cant = it.cantidad || 1;
-    const precio = it.precio || 0;
+    const nombre  = trunc(nombreRaw, NAME_MAX);
+    const cant    = it.cantidad || 1;
+    const precio  = it.precio || 0;
     const subtotal = cant * precio;
-    const label = `${cant}x ${nombre}`;
-    parts.push(txt(pad(label, WIDTH - 12) + padLeft(money(subtotal), 12) + '\n'));
+    const label   = `${cant}x  ${nombre}`;
+    parts.push(txt(pad(label, WIDTH - 10) + padLeft(money(subtotal), 10) + '\n'));
     if (cant > 1) {
-      parts.push(txt('   ' + pad(`${money(precio)} c/u`, WIDTH - 3) + '\n'));
+      parts.push(txt('      ' + money(precio) + ' c/u\n'));
     }
     if (it.observaciones) {
       const obs = String(it.observaciones);
-      const maxLen = WIDTH - 5;
+      const maxLen = WIDTH - 6;
       for (let i = 0; i < obs.length; i += maxLen) {
         parts.push(txt('   >> ' + obs.slice(i, i + maxLen) + '\n'));
       }
     }
   }
-
   parts.push(rule('-'));
 
-  // Total en doble alto + bold
+  // ── TOTALES ──────────────────────────────────────────────
+  if (pedido.descuento_pct) {
+    const totalAntes = Math.round(pedido.total / (1 - pedido.descuento_pct / 100));
+    const descMonto  = totalAntes - pedido.total;
+    parts.push(txt(pad('Subtotal', WIDTH - 10) + padLeft(money(totalAntes), 10) + '\n'));
+    parts.push(txt(pad(`Descuento (${pedido.descuento_pct}%)`, WIDTH - 10) + padLeft('-' + money(descMonto), 10) + '\n'));
+  }
+  parts.push(rule('.'));
   parts.push(C.size_dbl_h, C.bold_on);
-  parts.push(txt(pad('TOTAL', 18) + padLeft(money(pedido.total), 6) + '\n'));
+  parts.push(txt(pad('TOTAL', WIDTH - 10) + padLeft(money(pedido.total), 10) + '\n'));
   parts.push(C.size_normal, C.bold_off);
 
   if (pedido.metodo_pago) {
-    const met = pedido.metodo_pago === 'efectivo' ? 'Efectivo'
-              : pedido.metodo_pago === 'transferencia' ? 'Transferencia'
-              : pedido.metodo_pago === 'cuenta_corriente' ? 'Cuenta corriente'
-              : pedido.metodo_pago;
+    const met = { efectivo: 'Efectivo', transferencia: 'Transferencia', cuenta_corriente: 'Cuenta corriente' }[pedido.metodo_pago] || pedido.metodo_pago;
     parts.push(txt(`Pago: ${met}\n`));
     if (pedido.cliente) {
-      parts.push(txt(`Cliente: ${pedido.cliente.nombre || ''} ${pedido.cliente.apellido || ''}\n`.replace(/\s+\n/, '\n')));
+      const cNombre = `${pedido.cliente.nombre || ''} ${pedido.cliente.apellido || ''}`.trim();
+      if (cNombre) parts.push(txt(`A nombre de: ${trunc(cNombre, WIDTH - 13)}\n`));
     }
   }
 
+  // ── PIE ──────────────────────────────────────────────────
   parts.push(rule('='));
   parts.push(C.align_c);
-  parts.push(txt('¡Gracias por su compra!\n'));
+  parts.push(txt('¡Gracias por su visita!\n'));
+  parts.push(txt('@cantinanyg\n'));
   parts.push(C.align_l);
   parts.push(C.double_strike_off);
   parts.push(C.feed(1));      // avance mínimo — el corte ya incluye 120 dots de feed
@@ -175,9 +201,9 @@ function buildTestBuffer() {
   const parts = [];
   parts.push(C.init, C.cp858, C.epson_density_max, C.double_strike_on);
   parts.push(C.align_c, C.size_dbl_wh, C.bold_on);
-  parts.push(txt('CANTINA POS\n'));
+  parts.push(txt('CANTINA NyG\n'));
   parts.push(C.size_normal, C.bold_off);
-  parts.push(txt('Prueba de impresión\n'));
+  parts.push(txt('Prueba de impresion\n'));
   parts.push(rule('='));
   parts.push(C.align_l);
   parts.push(txt(`Fecha: ${new Date().toLocaleString('es-AR')}\n`));
