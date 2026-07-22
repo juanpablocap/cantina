@@ -9,9 +9,9 @@ const { execFile } = require('child_process');
 const iconv = require('iconv-lite');
 
 const CANDIDATES = ['/dev/usb/lp0', '/dev/usb/lp1', '/dev/usb/lp2', '/dev/lp0', '/dev/lp1'];
-const WIDTH = 40;
+const WIDTH = 32;
 const CODEPAGE = 'cp858';
-const NAME_MAX = 20;   // caracteres máximos del nombre de un item antes de truncar
+const NAME_MAX = 16;   // caracteres máximos del nombre de un item antes de truncar
 
 const ESC = 0x1B, GS = 0x1D;
 const C = {
@@ -139,7 +139,7 @@ function buildTicketBuffer(pedido) {
   parts.push(rule('-'));
 
   // ── ITEMS ────────────────────────────────────────────────
-  parts.push(txt(pad('CANT  DESCRIPCION', WIDTH - 10) + padLeft('SUBTOTAL', 10) + '\n'));
+  parts.push(txt(pad('CANT DESCRIPCION', WIDTH - 9) + padLeft('TOTAL', 9) + '\n'));
   parts.push(rule('-'));
 
   for (const it of (pedido.items || [])) {
@@ -148,8 +148,8 @@ function buildTicketBuffer(pedido) {
     const cant    = it.cantidad || 1;
     const precio  = it.precio || 0;
     const subtotal = cant * precio;
-    const label   = `${cant}x  ${nombre}`;
-    parts.push(txt(pad(label, WIDTH - 10) + padLeft(money(subtotal), 10) + '\n'));
+    const label   = `${cant}x ${nombre}`;
+    parts.push(txt(pad(label, WIDTH - 9) + padLeft(money(subtotal), 9) + '\n'));
     if (cant > 1) {
       parts.push(txt('      ' + money(precio) + ' c/u\n'));
     }
@@ -167,12 +167,12 @@ function buildTicketBuffer(pedido) {
   if (pedido.descuento_pct) {
     const totalAntes = Math.round(pedido.total / (1 - pedido.descuento_pct / 100));
     const descMonto  = totalAntes - pedido.total;
-    parts.push(txt(pad('Subtotal', WIDTH - 10) + padLeft(money(totalAntes), 10) + '\n'));
-    parts.push(txt(pad(`Descuento (${pedido.descuento_pct}%)`, WIDTH - 10) + padLeft('-' + money(descMonto), 10) + '\n'));
+    parts.push(txt(pad('Subtotal', WIDTH - 9) + padLeft(money(totalAntes), 9) + '\n'));
+    parts.push(txt(pad(`Desc. ${pedido.descuento_pct}%`, WIDTH - 9) + padLeft('-' + money(descMonto), 9) + '\n'));
   }
   parts.push(rule('.'));
   parts.push(C.size_dbl_h, C.bold_on);
-  parts.push(txt(pad('TOTAL', WIDTH - 10) + padLeft(money(pedido.total), 10) + '\n'));
+  parts.push(txt(pad('TOTAL', WIDTH - 9) + padLeft(money(pedido.total), 9) + '\n'));
   parts.push(C.size_normal, C.bold_off);
 
   if (pedido.metodo_pago) {

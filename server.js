@@ -791,36 +791,36 @@ app.get('/api/pedidos/:id/ticket', async (req, res) => {
     const numero = String(pedido.numero).padStart(3,'0');
 
     let ticket = '';
-    ticket += '========================================\n';
-    ticket += '            CANTINA NyG\n';
-    ticket += '      Club Natacion y Gimnasia\n';
-    ticket += '      San Miguel de Tucuman\n';
-    ticket += '========================================\n';
-    ticket += `${dd}/${mmes}/${yy} ${hh}:${min}`.padEnd(28) + tipo + '\n';
+    ticket += '================================\n';
+    ticket += '         CANTINA NyG\n';
+    ticket += '   Club Natacion y Gimnasia\n';
+    ticket += '   San Miguel de Tucuman\n';
+    ticket += '================================\n';
+    ticket += `${dd}/${mmes}/${yy} ${hh}:${min}`.padEnd(32 - tipo.length) + tipo + '\n';
     ticket += `Ticket #${String(pedido.id).padStart(4,'0')}\n`;
-    ticket += '........................................\n';
-    ticket += `        PEDIDO #${numero}\n`;
-    ticket += '----------------------------------------\n';
-    ticket += 'CANT  DESCRIPCION           SUBTOTAL\n';
-    ticket += '----------------------------------------\n';
+    ticket += '................................\n';
+    ticket += `     PEDIDO #${numero}\n`;
+    ticket += '--------------------------------\n';
+    ticket += 'CANT DESCRIPCION      TOTAL\n';
+    ticket += '--------------------------------\n';
 
     for (const item of pedido.items) {
-      const nombre = item.producto?.nombre || '?';
+      const nombre = (item.producto?.nombre || '?').slice(0, 16);
       const subtotal = item.cantidad * item.precio;
-      const label = `${item.cantidad}x  ${nombre}`.slice(0, 30);
-      ticket += label.padEnd(30) + `$${subtotal.toLocaleString('es-AR')}`.padStart(10) + '\n';
+      const label = `${item.cantidad}x ${nombre}`.slice(0, 23);
+      ticket += label.padEnd(23) + `$${subtotal.toLocaleString('es-AR')}`.padStart(9) + '\n';
       if (item.cantidad > 1) ticket += `      $${item.precio.toLocaleString('es-AR')} c/u\n`;
       if (item.observaciones) ticket += `   >> ${item.observaciones}\n`;
     }
 
-    ticket += '----------------------------------------\n';
+    ticket += '--------------------------------\n';
     if (pedido.descuento_pct) {
       const totalAntes = Math.round(pedido.total / (1 - pedido.descuento_pct / 100));
-      ticket += 'Subtotal'.padEnd(30) + `$${totalAntes.toLocaleString('es-AR')}`.padStart(10) + '\n';
-      ticket += `Descuento (${pedido.descuento_pct}%)`.padEnd(30) + `-$${(totalAntes - pedido.total).toLocaleString('es-AR')}`.padStart(10) + '\n';
+      ticket += 'Subtotal'.padEnd(23) + `$${totalAntes.toLocaleString('es-AR')}`.padStart(9) + '\n';
+      ticket += `Desc. ${pedido.descuento_pct}%`.padEnd(23) + `-$${(totalAntes - pedido.total).toLocaleString('es-AR')}`.padStart(9) + '\n';
     }
-    ticket += '........................................\n';
-    ticket += 'TOTAL'.padEnd(30) + `$${pedido.total.toLocaleString('es-AR')}`.padStart(10) + '\n';
+    ticket += '................................\n';
+    ticket += 'TOTAL'.padEnd(23) + `$${pedido.total.toLocaleString('es-AR')}`.padStart(9) + '\n';
 
     if (pedido.cobrado) {
       const met = { efectivo: 'Efectivo', transferencia: 'Transferencia', cuenta_corriente: 'Cuenta corriente' }[pedido.metodo_pago] || pedido.metodo_pago;
@@ -828,10 +828,10 @@ app.get('/api/pedidos/:id/ticket', async (req, res) => {
       if (pedido.cliente) ticket += `A nombre de: ${pedido.cliente.nombre} ${pedido.cliente.apellido || ''}\n`;
     }
 
-    ticket += '========================================\n';
-    ticket += '       ¡Gracias por su visita!\n';
-    ticket += '            @cantinanyg\n';
-    ticket += '========================================\n';
+    ticket += '================================\n';
+    ticket += '    ¡Gracias por su visita!\n';
+    ticket += '         @cantinanyg\n';
+    ticket += '================================\n';
 
     res.json({ ticket, pedido });
   } catch(e) {
