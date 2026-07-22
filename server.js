@@ -214,6 +214,46 @@ app.post('/api/system/backup', async (req, res) => {
   }
 });
 
+// Reset a producción — borra todos los datos de prueba, conserva usuarios
+app.post('/api/system/reset-produccion', async (req, res) => {
+  try {
+    const backupDir = path.join(__dirname, 'backups');
+    if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+
+    // 1. Backup de seguridad pre-reset
+    const filename = `pre_reset_${new Date().toISOString().slice(0,19).replace(/[:-]/g,'')}.sql`;
+    const filepath = path.join(backupDir, filename);
+    execSync(`PGPASSWORD=cantina2025 pg_dump -U cantina -h localhost cantina_pos > ${filepath}`, { timeout: 30000 });
+
+    // 2. Truncar en orden FK correcto
+    await prisma.$executeRawUnsafe(`TRUNCATE TABLE "PedidoItem" RESTART IDENTITY CASCADE`);
+    await prisma.$executeRawUnsafe(`TRUNCATE TABLE "Pedido" RESTART IDENTITY CASCADE`);
+    await prisma.$executeRawUnsafe(`TRUNCATE TABLE "CierreCaja" RESTART IDENTITY CASCADE`);
+    await prisma.$executeRawUnsafe(`TRUNCATE TABLE "ClientePago" RESTART IDENTITY CASCADE`);
+    await prisma.$executeRawUnsafe(`TRUNCATE TABLE "Cliente" RESTART IDENTITY CASCADE`);
+    await prisma.$executeRawUnsafe(`TRUNCATE TABLE "Producto" RESTART IDENTITY CASCADE`);
+    await prisma.$executeRawUnsafe(`TRUNCATE TABLE "Categoria" RESTART IDENTITY CASCADE`);
+    await prisma.$executeRawUnsafe(`TRUNCATE TABLE "CarouselImage" RESTART IDENTITY CASCADE`);
+
+    // 3. Borrar imágenes del carrusel
+    const imagesDir = path.join(__dirname, 'images');
+    if (fs.existsSync(imagesDir)) {
+      fs.readdirSync(imagesDir)
+        .filter(f => !f.startsWith('.'))
+        .forEach(f => fs.unlinkSync(path.join(imagesDir, f)));
+    }
+
+    // 4. Borrar backups viejos (conservar solo el pre-reset recién creado)
+    fs.readdirSync(backupDir)
+      .filter(f => f.endsWith('.sql') && f !== filename)
+      .forEach(f => fs.unlinkSync(path.join(backupDir, f)));
+
+    res.json({ ok: true, backup: filename });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ============================================
 // USUARIOS
 // ============================================

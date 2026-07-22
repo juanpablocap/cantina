@@ -418,6 +418,7 @@ window.__App = function CantinaFull() {
   const [sysHistory, setSysHistory] = useState([]);
   const [backupModal, setBackupModal] = useState(null); // null | { status, message }
   const [sysActionModal, setSysActionModal] = useState(null); // null | { type:'restart'|'shutdown', status:'confirm'|'loading'|'done'|'error', message }
+  const [resetProdModal, setResetProdModal] = useState(null); // null | { status:'loading'|'ok'|'error', message }
   const [masSheet, setMasSheet] = useState(false); // Modern POS v2 "Más" drawer
   const mesaInputRef = useRef(null);
   const busquedaRef = useRef(null);
@@ -3387,7 +3388,7 @@ window.__App = function CantinaFull() {
       {pinModal && (() => {
         const cli = pinModal.clienteId ? clientes.find(c => c.id === pinModal.clienteId) : null;
         if (pinModal.clienteId && !cli && pinModal.action !== "cancelar") return null;
-        const PIN_CORRECTO = "1234";
+        const PIN_CORRECTO = pinModal.action === "resetProduccion" ? "0000" : "1234";
         const pinCompleto = pinModal.pin.length === 4;
         const pinCorrecto = pinModal.pin === PIN_CORRECTO;
         const pinIncorrecto = pinCompleto && !pinCorrecto;
@@ -3411,6 +3412,17 @@ window.__App = function CantinaFull() {
             await apiFetch(`/usuarios/${pinModal.userId}`, { method: 'DELETE' });
             setUsuarios(prev => prev.filter(u => u.id !== pinModal.userId));
             showMsg("🗑 Usuario eliminado");
+          } else if (pinModal.action === "resetProduccion") {
+            setPinModal(null);
+            setResetProdModal({ status: "loading", message: "⏳ Borrando datos y haciendo backup de seguridad..." });
+            const r = await apiFetch('/system/reset-produccion', { method: 'POST' });
+            if (r && r.ok) {
+              setPedidos([]); setProductos([]); setCategorias([]); setClientes([]);
+              setResetProdModal({ status: "ok", message: `✅ Sistema reseteado.\nBackup guardado: ${r.backup}` });
+            } else {
+              setResetProdModal({ status: "error", message: "❌ Error: " + (r?.error || "desconocido") });
+            }
+            return;
           }
           setPinModal(null);
         };
@@ -3426,11 +3438,12 @@ window.__App = function CantinaFull() {
           }
         };
 
-        const actionTitle = pinModal.action === "eliminar" ? "Eliminar cliente" : pinModal.action === "cancelar" ? "Cancelar pedido" : pinModal.action === "eliminarUsuario" ? "Eliminar usuario" : "Confirmar pago";
-        const actionIcon = pinModal.action === "eliminar" ? "🗑" : pinModal.action === "cancelar" ? "❌" : pinModal.action === "eliminarUsuario" ? "🗑" : "💵";
+        const actionTitle = pinModal.action === "eliminar" ? "Eliminar cliente" : pinModal.action === "cancelar" ? "Cancelar pedido" : pinModal.action === "eliminarUsuario" ? "Eliminar usuario" : pinModal.action === "resetProduccion" ? "Reset a producción" : "Confirmar pago";
+        const actionIcon = pinModal.action === "eliminar" ? "🗑" : pinModal.action === "cancelar" ? "❌" : pinModal.action === "eliminarUsuario" ? "🗑" : pinModal.action === "resetProduccion" ? "⚠️" : "💵";
         const actionDesc = pinModal.action === "eliminar" ? `¿Eliminar a ${cli?.nombre} ${cli?.apellido}?`
           : pinModal.action === "cancelar" ? `¿Cancelar pedido #${String(pedidos.find(p => p.id === pinModal.pedidoId)?.numero || 0).padStart(3, "0")}? Se devuelve el stock.`
           : pinModal.action === "eliminarUsuario" ? `¿Eliminar usuario ${usuarios.find(u => u.id === pinModal.userId)?.nombre}?`
+          : pinModal.action === "resetProduccion" ? "Borra productos, categorías, clientes, ventas, cierres y backups. Se hace backup de seguridad automático. Esta acción no se puede deshacer."
           : `Registrar pago de $${pinModal.pagoMonto?.toLocaleString()} a ${cli?.nombre} ${cli?.apellido}`;
 
         return (
@@ -4001,6 +4014,15 @@ window.__App = function CantinaFull() {
                 <div style={{ fontSize: 15, fontWeight: 900, color: S.text, marginTop: 2, fontFamily: "'JetBrains Mono', monospace" }}>{ip}</div>
               </div>
             </div>
+            <button onClick={() => setPinModal({ action: "resetProduccion", pin: "" })} style={{
+              padding: "8px 14px", borderRadius: 10, border: `1px solid ${S.danger}50`,
+              background: S.danger + "12", color: S.danger,
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+              cursor: "pointer", flexShrink: 0,
+            }}>
+              <span style={{ fontSize: 18 }}>🗑</span>
+              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.04em" }}>RESET</span>
+            </button>
             <button onClick={() => setSysActionModal({ type: 'restart', status: 'confirm' })} style={{
               padding: "10px 18px", borderRadius: 10, border: `1px solid ${S.warning}50`,
               background: S.warning + "18", color: S.warning,
@@ -4283,6 +4305,18 @@ window.__App = function CantinaFull() {
             <div style={{ fontSize: 16, fontWeight: 700, color: S.text, lineHeight: 1.5, marginBottom: 16 }}>{backupModal.message}</div>
             {backupModal.status !== "loading" && (
               <button onClick={() => setBackupModal(null)} style={{ padding: "12px 32px", borderRadius: 10, border: "none", background: backupModal.status === "ok" ? S.success : S.danger, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>OK</button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {resetProdModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.7)" }}>
+          <div style={{ width: 400, padding: 28, borderRadius: 18, background: S.surface, border: `2px solid ${resetProdModal.status === "error" ? S.danger : resetProdModal.status === "ok" ? S.success : S.info}`, textAlign: "center" }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>{resetProdModal.status === "loading" ? "⏳" : resetProdModal.status === "ok" ? "✅" : "❌"}</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: S.text, lineHeight: 1.6, marginBottom: 16, whiteSpace: "pre-line" }}>{resetProdModal.message}</div>
+            {resetProdModal.status !== "loading" && (
+              <button onClick={() => setResetProdModal(null)} style={{ padding: "12px 32px", borderRadius: 10, border: "none", background: resetProdModal.status === "ok" ? S.success : S.danger, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>OK</button>
             )}
           </div>
         </div>
