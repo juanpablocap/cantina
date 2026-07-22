@@ -451,7 +451,7 @@ app.post('/api/pedidos', async (req, res) => {
 app.put('/api/pedidos/:id', async (req, res) => {
   try {
     const { estado } = req.body;
-    const estadosValidos = ['pendiente', 'preparando', 'listo', 'entregado'];
+    const estadosValidos = ['pendiente', 'en_preparacion', 'listo', 'entregado'];
     if (!estado) return res.status(400).json({ error: 'estado requerido' });
     // 'cancelado' debe ir por /cancelar que restaura el stock
     if (!estadosValidos.includes(estado)) return res.status(400).json({ error: `estado inválido (usar: ${estadosValidos.join(', ')})` });
@@ -913,7 +913,7 @@ io.on('connection', (socket) => {
 
   // Estado changes from cocina
   socket.on('cambiar-estado', async (data) => {
-    const estadosValidos = ['pendiente', 'preparando', 'listo', 'entregado'];
+    const estadosValidos = ['pendiente', 'en_preparacion', 'listo', 'entregado'];
     if (!data?.id || !estadosValidos.includes(data?.estado)) return;
     try {
       const pedido = await prisma.pedido.update({
