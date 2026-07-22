@@ -875,7 +875,7 @@ window.__App = function CantinaFull() {
     }
 
     if (allOk) {
-      setPedidos(prev => prev.map(p => pedidosACobrar.includes(p.id) ? { ...p, cobrado: true, metodo_pago: metodo, estado: "entregado", cliente_id: clienteId } : p));
+      setPedidos(prev => prev.map(p => pedidosACobrar.includes(p.id) ? { ...p, cobrado: true, metodo_pago: metodo, cliente_id: clienteId, ...(pedOriginal?.tipo !== 'mesa' ? { estado: "entregado" } : {}) } : p));
       const totalCobrado = pedidosACobrar.reduce((s, pid) => { const p = pedidos.find(x => x.id === pid); return s + (p ? p.total : 0); }, 0);
       setCajaMovimientos(prev => [...prev, {
         tipo: "venta", metodo, monto: totalCobrado, pedido_num: pedOriginal?.numero || 0,
@@ -933,8 +933,18 @@ window.__App = function CantinaFull() {
     await apiFetch('/mesas/mozos', { method: 'PUT', body: { mesa, userId: userId ?? null } });
   };
 
+  const liberarMesa = async (num) => {
+    if (!window.confirm(`¿Liberar mesa ${num}? La mesa quedará libre para nuevos clientes.`)) return;
+    const result = await apiFetch(`/mesas/${num}/liberar`, { method: 'POST' });
+    if (!result) { showMsg("❌ Error al liberar mesa"); return; }
+    setPedidos(prev => prev.map(p => p.tipo === 'mesa' && Number(p.mesa_numero) === num ? { ...p, mesa_liberada: true } : p));
+    setMesasMozos(prev => { const next = { ...prev }; delete next[num]; return next; });
+    setMesaSeleccionada(null);
+    showMsg(`✅ Mesa ${num} liberada`);
+  };
+
   // Mesa helpers
-  const pedidosMesa = (num) => pedidos.filter(p => p.tipo === "mesa" && Number(p.mesa_numero) === Number(num) && !p.cobrado && p.estado !== 'cancelado');
+  const pedidosMesa = (num) => pedidos.filter(p => p.tipo === "mesa" && Number(p.mesa_numero) === Number(num) && !p.mesa_liberada && p.estado !== 'cancelado');
   const mesaActiva = (num) => pedidosMesa(num).length > 0;
   const totalMesa = (num) => pedidosMesa(num).filter(p => !p.cobrado).reduce((s, p) => s + p.total, 0);
 
@@ -1637,28 +1647,32 @@ window.__App = function CantinaFull() {
         const getMesaStatus = (num) => {
           const peds = pedidosMesa(num);
           if (peds.length === 0) return 'libre';
+          const allEntregado = peds.every(p => p.estado === 'entregado');
+          const allCobrado = peds.every(p => p.cobrado);
+          if (allEntregado && allCobrado) return 'lista_liberar';
           const firstMs = Math.min(...peds.map(p => new Date(p.createdAt).getTime()));
           if ((Date.now() - firstMs) / 60000 >= 30) return 'urgente';
           if (peds.some(p => p.estado === 'entregado' && !p.cobrado)) return 'por_cobrar';
           if (peds.some(p => p.estado === 'listo')) return 'lista';
           return 'preparando';
         };
-        const tblStatusOrder = { urgente: 0, por_cobrar: 1, lista: 2, preparando: 3, libre: 4 };
+        const tblStatusOrder = { lista_liberar: 0, urgente: 1, por_cobrar: 2, lista: 3, preparando: 4, libre: 5 };
         const mesasConInfo = Array.from({ length: MESAS_TOTAL }, (_, i) => i + 1)
           .map(num => ({ num, status: getMesaStatus(num), peds: pedidosMesa(num) }))
           .sort((a, b) => tblStatusOrder[a.status] - tblStatusOrder[b.status]);
-        const tblCounts = { urgente: 0, por_cobrar: 0, lista: 0, preparando: 0, libre: 0 };
+        const tblCounts = { lista_liberar: 0, urgente: 0, por_cobrar: 0, lista: 0, preparando: 0, libre: 0 };
         mesasConInfo.forEach(m => tblCounts[m.status]++);
-        const tblOcupadas = tblCounts.urgente + tblCounts.por_cobrar + tblCounts.lista + tblCounts.preparando;
+        const tblOcupadas = tblCounts.lista_liberar + tblCounts.urgente + tblCounts.por_cobrar + tblCounts.lista + tblCounts.preparando;
         const mesasFiltradas = mesasTabFilter === 'todas' ? mesasConInfo
           : mesasTabFilter === 'ocupadas' ? mesasConInfo.filter(m => m.status !== 'libre')
           : mesasConInfo.filter(m => m.status === mesasTabFilter);
         const tblCfg = {
-          urgente:    { label: '+30 min',    border: S.danger,  bg: S.danger   + '20', col: S.danger   },
-          por_cobrar: { label: 'Por cobrar', border: S.accent,  bg: S.accent   + '20', col: S.accent   },
-          lista:      { label: 'Listo',      border: S.success, bg: S.success  + '20', col: S.success  },
-          preparando: { label: 'Preparando', border: S.warning, bg: S.warning  + '20', col: S.warning  },
-          libre:      { label: 'Libre',      border: 'transparent', bg: 'transparent', col: S.muted    },
+          lista_liberar: { label: 'Liberar',    border: S.info,    bg: S.info     + '25', col: S.info     },
+          urgente:       { label: '+30 min',    border: S.danger,  bg: S.danger   + '20', col: S.danger   },
+          por_cobrar:    { label: 'Por cobrar', border: S.accent,  bg: S.accent   + '20', col: S.accent   },
+          lista:         { label: 'Listo',      border: S.success, bg: S.success  + '20', col: S.success  },
+          preparando:    { label: 'Preparando', border: S.warning, bg: S.warning  + '20', col: S.warning  },
+          libre:         { label: 'Libre',      border: 'transparent', bg: 'transparent', col: S.muted    },
         };
 
         return (
@@ -1679,17 +1693,20 @@ window.__App = function CantinaFull() {
                   {Array.from({ length: MESAS_TOTAL }, (_, i) => i + 1).map(num => {
                     const peds = pedidosMesa(num);
                     const activa = peds.length > 0;
-                    const pagoPend = peds.some(p => p.estado === "entregado" && !p.cobrado);
-                    const enCocina = peds.some(p => ["pendiente", "en_preparacion"].includes(p.estado));
-                    const tieneListos = peds.some(p => p.estado === "listo");
+                    const allEntregado = activa && peds.every(p => p.estado === 'entregado');
+                    const allCobrado = activa && peds.every(p => p.cobrado);
+                    const puedeLiberarse = allEntregado && allCobrado;
+                    const tieneListos = peds.some(p => p.estado === 'listo');
+                    const enCocina = peds.some(p => ['pendiente', 'en_preparacion'].includes(p.estado));
+                    const porCobrar = !allCobrado && (allEntregado || tieneListos);
                     const isSelected = sel === num;
-                    const bg = !activa ? S.border + "40" : pagoPend ? S.danger + "30" : tieneListos ? S.success + "30" : enCocina ? S.warning + "30" : S.accent + "20";
-                    const brd = isSelected ? S.accent : !activa ? "transparent" : pagoPend ? S.danger : tieneListos ? S.success : enCocina ? S.warning : S.accent + "50";
+                    const bg = !activa ? S.border + "40" : puedeLiberarse ? S.info + "25" : porCobrar ? S.danger + "30" : tieneListos ? S.success + "30" : enCocina ? S.warning + "30" : S.accent + "20";
+                    const brd = isSelected ? S.accent : !activa ? "transparent" : puedeLiberarse ? S.info : porCobrar ? S.danger : tieneListos ? S.success : enCocina ? S.warning : S.accent + "50";
                     const sz = activas <= 6 ? 76 : activas <= 12 ? 64 : activas <= 20 ? 56 : 48;
                     const fs = activas <= 6 ? 22 : activas <= 12 ? 18 : 16;
                     return (
                       <button key={num} onClick={() => setMesaSeleccionada(isSelected ? null : num)}
-                        className={pagoPend && !isSelected ? "pago-pend" : ""}
+                        className={porCobrar && !isSelected ? "pago-pend" : ""}
                         style={{
                           width: sz, height: sz, borderRadius: 12, border: `3px solid ${brd}`,
                           background: bg, cursor: "pointer", display: "flex", flexDirection: "column",
@@ -1699,9 +1716,10 @@ window.__App = function CantinaFull() {
                         }}>
                         <span style={{ fontSize: fs, fontWeight: 900, color: activa ? S.text : S.muted, fontFamily: "'JetBrains Mono', monospace" }}>{num}</span>
                         {activa && (
-                          <span style={{ fontSize: 7, fontWeight: 800, color: pagoPend ? S.danger : tieneListos ? S.success : enCocina ? S.warning : S.muted, marginTop: 1 }}>
-                            {pagoPend ? "💳" : tieneListos ? "✅" : enCocina ? "🔥" : "●"}
-                          </span>
+                          <div style={{ display: "flex", gap: 3, marginTop: 2, alignItems: "center" }}>
+                            <span title="Cocina" style={{ fontSize: 7, color: allEntregado ? S.success : tieneListos ? S.success : enCocina ? S.warning : S.muted }}>●</span>
+                            <span title="Pago" style={{ fontSize: 7, color: allCobrado ? S.success : S.danger }}>●</span>
+                          </div>
                         )}
                       </button>
                     );
@@ -1793,7 +1811,11 @@ window.__App = function CantinaFull() {
                               </div>
                               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2, paddingTop: 6, borderTop: `1px solid ${S.border}` }}>
                                 <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 700, color: timerCol }}>⏱ {eMin}:{String(eSec).padStart(2, "0")}</span>
-                                <span style={{ fontSize: 12, fontWeight: 800, color: S.accent }}>${mTotal.toLocaleString()}</span>
+                                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                                  <span title="Cocina" style={{ fontSize: 8, color: mPeds.every(p => p.estado === 'entregado') ? S.success : mPeds.some(p => p.estado === 'listo') ? S.success : S.warning }}>●</span>
+                                  <span title="Pago" style={{ fontSize: 8, color: mPeds.every(p => p.cobrado) ? S.success : S.danger }}>●</span>
+                                  <span style={{ fontSize: 12, fontWeight: 800, color: S.accent }}>${mTotal.toLocaleString()}</span>
+                                </div>
                               </div>
                             </>
                           )}
@@ -1875,23 +1897,41 @@ window.__App = function CantinaFull() {
 
                     {/* Total + actions */}
                     <div style={{ borderTop: `1px solid ${S.border}`, paddingTop: 10 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: S.muted }}>TOTAL</span>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: S.muted }}>TOTAL PENDIENTE</span>
                         <span style={{ fontSize: 22, fontWeight: 900, color: S.accent }}>${selTotal.toLocaleString()}</span>
                       </div>
-                      <div style={{ display: "flex", gap: 6 }}>
-                        {selPeds.some(p => p.estado === "listo") && (
-                          <button onClick={() => { selPeds.filter(p => p.estado === "listo").forEach(p => marcarEntregado(p.id)); }} style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "none", background: S.success, color: "#000", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
-                            ✅ Entregado
-                          </button>
-                        )}
-                        {selPeds.some(p => !p.cobrado && ["listo", "entregado"].includes(p.estado)) && (
-                          <button onClick={() => {
-                            const allItems = selPeds.flatMap(p => p.items.map(i => ({ ...i, pedNum: p.numero })));
-                            const merged = { ...selPeds[0], total: selTotal, items: allItems, numero: selPeds.map(p => p.numero).join("+") };
-                            setCobrandoPedido(merged);
-                          }} style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "none", background: S.accent, color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
-                            💰 Cobrar mesa
+                      {/* Indicadores de estado */}
+                      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: selPeds.every(p => p.estado === 'entregado') ? S.success : S.muted }}>
+                          {selPeds.every(p => p.estado === 'entregado') ? "✅" : "⏳"} Entregado
+                        </span>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: selPeds.every(p => p.cobrado) ? S.success : S.muted }}>
+                          {selPeds.every(p => p.cobrado) ? "✅" : "⏳"} Pagado
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", gap: 6, flexDirection: "column" }}>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          {selPeds.some(p => p.estado === "listo") && (
+                            <button onClick={() => { selPeds.filter(p => p.estado === "listo").forEach(p => marcarEntregado(p.id)); }} style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "none", background: S.success, color: "#000", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
+                              ✅ Entregado
+                            </button>
+                          )}
+                          {selPeds.some(p => !p.cobrado) && (
+                            <button onClick={() => {
+                              const sinCobrar = selPeds.filter(p => !p.cobrado);
+                              const allItems = sinCobrar.flatMap(p => p.items.map(i => ({ ...i, pedNum: p.numero })));
+                              const totalSinCobrar = sinCobrar.reduce((s, p) => s + p.total, 0);
+                              const merged = { ...sinCobrar[0], total: totalSinCobrar, items: allItems, numero: sinCobrar.map(p => p.numero).join("+") };
+                              setCobrandoPedido(merged);
+                            }} style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "none", background: S.accent, color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
+                              💰 Cobrar mesa
+                            </button>
+                          )}
+                        </div>
+                        {selPeds.length > 0 && selPeds.every(p => p.cobrado && p.estado === 'entregado') && (
+                          <button onClick={() => liberarMesa(sel)} style={{ width: "100%", padding: "10px 0", borderRadius: 8, border: "none", background: S.info, color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
+                            🚪 Liberar mesa
                           </button>
                         )}
                       </div>

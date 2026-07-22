@@ -77,6 +77,7 @@ model Pedido {
   metodo_pago     String?
   referencia      String?
   descuento_pct   Float?
+  mesa_liberada   Boolean      @default(false)
   cliente_id      Int?
   cliente         Cliente?     @relation(fields: [cliente_id], references: [id])
   items           PedidoItem[]
