@@ -13,6 +13,12 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
+// Medianoche en Argentina (UTC-3, sin DST) como objeto Date en UTC
+function midnightAR() {
+  const dateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Tucuman' });
+  return new Date(dateStr + 'T00:00:00-03:00');
+}
+
 // Circular buffer for system metrics history (last 120 samples @ 5s = 10 min)
 const METRICS_HISTORY_MAX = 120;
 const metricsHistory = [];
@@ -147,30 +153,37 @@ app.get('/api/system/history', (req, res) => {
   res.json(metricsHistory);
 });
 
-// Restart a service
+// Restart a service (postgresql, nginx — no cantina-api, ese usa /restart)
 app.post('/api/system/restart/:service', (req, res) => {
   const allowed = { 'cantina-api': true, 'postgresql': true };
   if (!allowed[req.params.service]) return res.status(400).json({ error: 'Not allowed' });
-  try {
-    exec(`sudo -n systemctl restart ${req.params.service}`, (err) => {
-      res.json({ restarted: true, service: req.params.service, error: err?.message || null });
-    });
-  } catch(e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Restart the main app service
-app.post('/api/system/restart', (req, res) => {
-  exec('sudo -n systemctl restart cantina-api', (err) => {
-    if (!res.headersSent) res.json({ ok: true, error: err?.message || null });
+  exec(`sudo -n systemctl restart ${req.params.service} 2>&1`, { timeout: 15000 }, (err, _out, stderr) => {
+    if (err) {
+      console.error(`[system] restart ${req.params.service} FAILED:`, stderr || err.message);
+      if (!res.headersSent) return res.status(500).json({ restarted: false, service: req.params.service, error: stderr || err.message });
+    }
+    if (!res.headersSent) res.json({ restarted: true, service: req.params.service });
   });
 });
 
-// Shutdown the server
+// Restart the main app service — responder ANTES de morir; systemd nos levanta de vuelta
+app.post('/api/system/restart', (req, res) => {
+  res.json({ ok: true, restarting: true });
+  setTimeout(() => exec('sudo -n systemctl restart cantina-api 2>&1', (_err, _o, se) => {
+    if (_err) console.error('[system] restart self FAILED:', se || _err.message);
+    else console.log('[system] reinicio en curso...');
+  }), 300);
+});
+
+// Shutdown the server — detectar falla real antes de responder éxito
 app.post('/api/system/shutdown', (req, res) => {
-  res.json({ ok: true });
-  setTimeout(() => exec('sudo -n shutdown now'), 500);
+  exec('sudo -n shutdown -h now 2>&1', { timeout: 5000 }, (err, _out, stderr) => {
+    if (err) {
+      console.error('[system] shutdown FAILED:', stderr || err.message);
+      return res.status(500).json({ ok: false, error: stderr || err.message });
+    }
+    if (!res.headersSent) res.json({ ok: true });
+  });
 });
 
 // Clear RAM cache
@@ -190,7 +203,7 @@ app.post('/api/system/backup', async (req, res) => {
     if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
     const filename = `cantina_${new Date().toISOString().slice(0,19).replace(/[:-]/g,'')}.sql`;
     const filepath = path.join(backupDir, filename);
-    execSync(`pg_dump cantina_pos > ${filepath}`, { timeout: 30000 });
+    execSync(`PGPASSWORD=cantina2025 pg_dump -U cantina -h localhost cantina_pos > ${filepath}`, { timeout: 30000 });
     // Keep only last 30 backups
     const files = fs.readdirSync(backupDir).filter(f => f.endsWith('.sql')).sort();
     while (files.length > 30) { fs.unlinkSync(path.join(backupDir, files.shift())); }
@@ -352,7 +365,7 @@ app.post('/api/clientes/:id/pago', async (req, res) => {
 // ============================================
 app.get('/api/pedidos', async (req, res) => {
   try {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const today = midnightAR();
     const pedidos = await prisma.pedido.findMany({
       where: { createdAt: { gte: today } },
       include: { items: { include: { producto: true } }, cliente: true },
@@ -401,7 +414,7 @@ app.post('/api/pedidos', async (req, res) => {
       return res.status(400).json({ error: 'cantidad inválida' });
 
     const pedido = await prisma.$transaction(async (tx) => {
-      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const today = midnightAR();
       const lastPedido = await tx.pedido.findFirst({ where: { createdAt: { gte: today } }, orderBy: { numero: 'desc' } });
       const numero = (lastPedido?.numero || 0) + 1;
       const pedido = await tx.pedido.create({
@@ -438,7 +451,10 @@ app.post('/api/pedidos', async (req, res) => {
 app.put('/api/pedidos/:id', async (req, res) => {
   try {
     const { estado } = req.body;
+    const estadosValidos = ['pendiente', 'preparando', 'listo', 'entregado'];
     if (!estado) return res.status(400).json({ error: 'estado requerido' });
+    // 'cancelado' debe ir por /cancelar que restaura el stock
+    if (!estadosValidos.includes(estado)) return res.status(400).json({ error: `estado inválido (usar: ${estadosValidos.join(', ')})` });
     const pedido = await prisma.pedido.update({
       where: { id: Number(req.params.id) },
       data: { estado },
@@ -522,10 +538,15 @@ app.post('/api/pedidos/:id/cobrar', async (req, res) => {
       if (descuento_pct) data.descuento_pct = descuento_pct;
       if (cliente_id) data.cliente_id = cliente_id;
 
+      // where cobrado:false es el guard atómico: si otra tx cobró mientras esperábamos
+      // el UPDATE no encuentra la fila y Prisma lanza P2025 → 409
       const pedido = await tx.pedido.update({
-        where: { id: Number(req.params.id) },
+        where: { id: Number(req.params.id), cobrado: false },
         data,
         include: { items: { include: { producto: true } }, cliente: true }
+      }).catch(e => {
+        if (e.code === 'P2025') throw Object.assign(new Error('Pedido ya cobrado'), { status: 409 });
+        throw e;
       });
       if (metodo_pago === 'cuenta_corriente' && cliente_id) {
         await tx.cliente.update({ where: { id: cliente_id }, data: { saldo: { increment: totalConDescuento } } });
@@ -614,7 +635,16 @@ app.post('/api/pedidos/:id/cancelar', async (req, res) => {
 // ============================================
 app.post('/api/cierres', async (req, res) => {
   try {
-    const cierre = await prisma.cierreCaja.create({ data: req.body });
+    const { efectivo, transferencia, fiado, totalVentas, cantPedidos } = req.body;
+    if ([efectivo, transferencia, fiado, totalVentas, cantPedidos].some(v => v == null))
+      return res.status(400).json({ error: 'Campos requeridos: efectivo, transferencia, fiado, totalVentas, cantPedidos' });
+    const cierre = await prisma.cierreCaja.create({ data: {
+      efectivo: Number(efectivo), transferencia: Number(transferencia), fiado: Number(fiado),
+      totalVentas: Number(totalVentas), cantPedidos: Number(cantPedidos),
+      arqueo: req.body.arqueo != null ? Number(req.body.arqueo) : null,
+      diferencia: req.body.diferencia != null ? Number(req.body.diferencia) : null,
+      details: req.body.details ?? null,
+    }});
     res.json(cierre);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -652,7 +682,7 @@ app.get('/api/estadisticas', async (req, res) => {
     } else if (range === 'all') {
       since = new Date(0);
     } else {
-      since = new Date(now); since.setHours(0, 0, 0, 0);
+      since = midnightAR();
     }
 
     const dateFilter = { gte: since };
@@ -857,14 +887,17 @@ io.on('connection', (socket) => {
 
   // Estado changes from cocina
   socket.on('cambiar-estado', async (data) => {
+    const estadosValidos = ['pendiente', 'preparando', 'listo', 'entregado'];
+    if (!data?.id || !estadosValidos.includes(data?.estado)) return;
     try {
       const pedido = await prisma.pedido.update({
         where: { id: data.id },
-        data: { estado: data.estado }
+        data: { estado: data.estado },
+        include: { items: { include: { producto: true } } }
       });
       io.emit('pedido-actualizado', pedido);
     } catch(e) {
-      console.error('Error cambiando estado:', e);
+      console.error('Error cambiando estado:', e.message);
     }
   });
 });
