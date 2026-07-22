@@ -217,30 +217,35 @@ app.post('/api/system/backup', async (req, res) => {
 // Reset a producción — borra todos los datos de prueba, conserva usuarios
 app.post('/api/system/reset-produccion', async (req, res) => {
   try {
+    // Borrar en orden FK correcto usando Prisma deleteMany
+    await prisma.pedidoItem.deleteMany({});
+    await prisma.pedido.deleteMany({});
+    await prisma.cierreCaja.deleteMany({});
+    await prisma.clientePago.deleteMany({});
+    await prisma.cliente.deleteMany({});
+    await prisma.producto.deleteMany({});
+    await prisma.categoria.deleteMany({});
+    await prisma.carouselImage.deleteMany({});
+
+    // Borrar backups viejos
     const backupDir = path.join(__dirname, 'backups');
-    if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+    if (fs.existsSync(backupDir)) {
+      fs.readdirSync(backupDir)
+        .filter(f => f.endsWith('.sql'))
+        .forEach(f => fs.unlinkSync(path.join(backupDir, f)));
+    }
 
-    // 1. Backup de seguridad pre-reset
-    const filename = `pre_reset_${new Date().toISOString().slice(0,19).replace(/[:-]/g,'')}.sql`;
+    // Backup del estado limpio post-reset
+    const filename = `post_reset_${new Date().toISOString().slice(0,19).replace(/[:-]/g,'')}.sql`;
     const filepath = path.join(backupDir, filename);
-    execSync(`PGPASSWORD=cantina2025 pg_dump -U cantina -h localhost cantina_pos > ${filepath}`, { timeout: 30000 });
+    try {
+      if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+      execSync(`PGPASSWORD=cantina2025 pg_dump -U cantina -h localhost cantina_pos > "${filepath}"`, { timeout: 30000 });
+    } catch(backupErr) {
+      console.warn('[reset-produccion] backup post-reset falló:', backupErr.message);
+    }
 
-    // 2. Truncar en orden FK correcto
-    await prisma.$executeRawUnsafe(`TRUNCATE TABLE "PedidoItem" RESTART IDENTITY CASCADE`);
-    await prisma.$executeRawUnsafe(`TRUNCATE TABLE "Pedido" RESTART IDENTITY CASCADE`);
-    await prisma.$executeRawUnsafe(`TRUNCATE TABLE "CierreCaja" RESTART IDENTITY CASCADE`);
-    await prisma.$executeRawUnsafe(`TRUNCATE TABLE "ClientePago" RESTART IDENTITY CASCADE`);
-    await prisma.$executeRawUnsafe(`TRUNCATE TABLE "Cliente" RESTART IDENTITY CASCADE`);
-    await prisma.$executeRawUnsafe(`TRUNCATE TABLE "Producto" RESTART IDENTITY CASCADE`);
-    await prisma.$executeRawUnsafe(`TRUNCATE TABLE "Categoria" RESTART IDENTITY CASCADE`);
-    await prisma.$executeRawUnsafe(`TRUNCATE TABLE "CarouselImage" RESTART IDENTITY CASCADE`);
-
-    // 3. Borrar backups viejos (conservar solo el pre-reset recién creado)
-    fs.readdirSync(backupDir)
-      .filter(f => f.endsWith('.sql') && f !== filename)
-      .forEach(f => fs.unlinkSync(path.join(backupDir, f)));
-
-    res.json({ ok: true, backup: filename });
+    res.json({ ok: true });
   } catch(e) {
     console.error('[reset-produccion]', e.message);
     res.json({ ok: false, error: e.message });

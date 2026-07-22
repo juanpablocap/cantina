@@ -3418,7 +3418,7 @@ window.__App = function CantinaFull() {
             const r = await apiFetch('/system/reset-produccion', { method: 'POST' });
             if (r && r.ok) {
               setPedidos([]); setProductos([]); setCategorias([]); setClientes([]);
-              setResetProdModal({ status: "ok", message: `✅ Sistema reseteado.\nBackup guardado: ${r.backup}` });
+              setResetProdModal({ status: "ok", message: "✅ Sistema reseteado.\nProductos, clientes, ventas y cierres eliminados." });
             } else {
               setResetProdModal({ status: "error", message: "❌ Error: " + (r?.error || "desconocido") });
             }
