@@ -785,8 +785,12 @@ app.get('/api/pedidos/:id/ticket', async (req, res) => {
     if (!pedido) return res.status(404).json({ error: 'No encontrado' });
 
     const fecha = new Date(pedido.createdAt);
-    const dd = String(fecha.getDate()).padStart(2,'0'), mmes = String(fecha.getMonth()+1).padStart(2,'0'), yy = String(fecha.getFullYear()).slice(-2);
-    const hh = String(fecha.getHours()).padStart(2,'0'), min = String(fecha.getMinutes()).padStart(2,'0');
+    const fp = new Intl.DateTimeFormat('es-AR', {
+      timeZone: 'America/Argentina/Tucuman',
+      day: '2-digit', month: '2-digit', year: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false,
+    }).formatToParts(fecha).reduce((a, p) => { a[p.type] = p.value; return a; }, {});
+    const dd = fp.day, mmes = fp.month, yy = fp.year, hh = fp.hour, min = fp.minute;
     const tipo = pedido.tipo === 'mesa' ? `Mesa ${pedido.mesa_numero}` : 'Barra';
     const numero = String(pedido.numero).padStart(3,'0');
 

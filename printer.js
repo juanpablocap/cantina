@@ -99,18 +99,18 @@ function writeToPrinter(buf) {
 
 function buildTicketBuffer(pedido) {
   const fecha = new Date(pedido.createdAt || Date.now());
-  const dd  = String(fecha.getDate()).padStart(2, '0');
-  const mm  = String(fecha.getMonth() + 1).padStart(2, '0');
-  const yy  = String(fecha.getFullYear()).slice(-2);
-  const hh  = String(fecha.getHours()).padStart(2, '0');
-  const min = String(fecha.getMinutes()).padStart(2, '0');
-  const fechaHora = `${dd}/${mm}/${yy} ${hh}:${min}`;
+  // Siempre mostrar en horario de Argentina (UTC-3, sin DST)
+  const fp = new Intl.DateTimeFormat('es-AR', {
+    timeZone: 'America/Argentina/Tucuman',
+    day: '2-digit', month: '2-digit', year: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(fecha).reduce((a, p) => { a[p.type] = p.value; return a; }, {});
+  const fechaHora = `${fp.day}/${fp.month}/${fp.year} ${fp.hour}:${fp.minute}`;
 
   const tipo      = pedido.tipo === 'mesa' ? `Mesa ${pedido.mesa_numero}` : 'Barra';
   const numero    = String(pedido.numero || 0).padStart(3, '0');
   const ticketId  = String(pedido.id || 0).padStart(4, '0');
   const mozoRaw   = pedido._mozo_nombre || '';
-  const mozoLabel = mozoRaw ? `Mozo: ${trunc(mozoRaw, 12)}` : '';
 
   const parts = [];
   parts.push(C.init, C.cp858, C.epson_density_max, C.double_strike_on);
@@ -125,17 +125,17 @@ function buildTicketBuffer(pedido) {
 
   // ── DATOS DE LA VENTA ───────────────────────────────────
   parts.push(C.align_l);
-  // Fila 1: fecha/hora izq — mesa der
-  parts.push(txt(pad(fechaHora, WIDTH - tipo.length) + tipo + '\n'));
-  // Fila 2: ticket # izq — mozo der
+  // Fila 1: fecha/hora izq — ticket# der
   const ticketLabel = `Ticket #${ticketId}`;
-  parts.push(txt(pad(ticketLabel, WIDTH - mozoLabel.length) + mozoLabel + '\n'));
-
-  // Número de pedido — bien visible para cocina/caja
+  parts.push(txt(pad(fechaHora, WIDTH - ticketLabel.length) + ticketLabel + '\n'));
+  // Mozo (si aplica)
+  if (mozoRaw) parts.push(txt(`Mozo: ${trunc(mozoRaw, WIDTH - 6)}\n`));
+  // Fila 2: mesa grande izq — pedido# bold der (doble alto)
+  const pedidoLabel = `PEDIDO #${numero}`;
   parts.push(rule('.'));
-  parts.push(C.align_c, C.size_dbl_h, C.bold_on);
-  parts.push(txt(`PEDIDO #${numero}\n`));
-  parts.push(C.size_normal, C.bold_off, C.align_l);
+  parts.push(C.size_dbl_h, C.bold_on);
+  parts.push(txt(pad(tipo, WIDTH - pedidoLabel.length) + pedidoLabel + '\n'));
+  parts.push(C.size_normal, C.bold_off);
   parts.push(rule('-'));
 
   // ── ITEMS ────────────────────────────────────────────────
@@ -206,7 +206,7 @@ function buildTestBuffer() {
   parts.push(txt('Prueba de impresion\n'));
   parts.push(rule('='));
   parts.push(C.align_l);
-  parts.push(txt(`Fecha: ${new Date().toLocaleString('es-AR')}\n`));
+  parts.push(txt(`Fecha: ${new Date().toLocaleString('es-AR', { timeZone: 'America/Argentina/Tucuman' })}\n`));
   parts.push(txt(`Host:  ${os.hostname()}\n`));
   parts.push(txt(`Nodo:  ${process.version}\n`));
   parts.push(rule('-'));
