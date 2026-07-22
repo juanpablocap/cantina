@@ -1552,7 +1552,8 @@ window.__App = function CantinaFull() {
                 const itemsCocina = p.items.filter(i => !i.despacho_directo);
                 const itemsDirecto = p.items.filter(i => i.despacho_directo);
                 const elapsed = Math.floor((Date.now() - new Date(p.createdAt).getTime()) / 1000);
-                const mins = Math.floor(elapsed / 60);
+                const hrs = Math.floor(elapsed / 3600);
+                const mins = Math.floor(elapsed / 60); const minsDisp = Math.floor((elapsed % 3600) / 60);
                 const secs = elapsed % 60;
 
                 return (
@@ -1572,7 +1573,7 @@ window.__App = function CantinaFull() {
                         )}
                       </div>
                       <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 22, fontWeight: 900, color: mins >= 10 ? S.danger : mins >= 5 ? S.warning : S.success }}>
-                        {mins}:{String(secs).padStart(2, "0")}
+                        {hrs > 0 ? `${hrs}:${String(minsDisp).padStart(2,"0")}:${String(secs).padStart(2,"0")}` : `${mins}:${String(secs).padStart(2,"0")}`}
                       </span>
                     </div>
 
@@ -1656,7 +1657,7 @@ window.__App = function CantinaFull() {
           const allCobrado = peds.every(p => p.cobrado);
           if (allCobrado) return 'lista_liberar';
           const firstMs = Math.min(...peds.map(p => new Date(p.createdAt).getTime()));
-          if ((Date.now() - firstMs) / 60000 >= 30) return 'urgente';
+          if ((Date.now() - firstMs) / 60000 >= 45) return 'urgente';
           if (peds.some(p => p.estado === 'entregado' && !p.cobrado)) return 'por_cobrar';
           if (peds.some(p => p.estado === 'listo')) return 'lista';
           return 'preparando';
@@ -1673,7 +1674,7 @@ window.__App = function CantinaFull() {
           : mesasConInfo.filter(m => m.status === mesasTabFilter);
         const tblCfg = {
           lista_liberar: { label: 'Liberar',    border: S.info,    bg: S.info     + '25', col: S.info     },
-          urgente:       { label: '+30 min',    border: S.danger,  bg: S.danger   + '20', col: S.danger   },
+          urgente:       { label: '+45 min',    border: S.danger,  bg: S.danger   + '20', col: S.danger   },
           por_cobrar:    { label: 'Por cobrar', border: S.accent,  bg: S.accent   + '20', col: S.accent   },
           lista:         { label: 'Listo',      border: S.success, bg: S.success  + '20', col: S.success  },
           preparando:    { label: 'Preparando', border: S.warning, bg: S.warning  + '20', col: S.warning  },
@@ -1772,9 +1773,12 @@ window.__App = function CantinaFull() {
                       const allItems = mPeds.flatMap(p => p.items);
                       const mTotal = mPeds.reduce((s, p) => s + p.total, 0);
                       const firstMs = mPeds.length ? Math.min(...mPeds.map(p => new Date(p.createdAt).getTime())) : null;
-                      const eMin = firstMs ? Math.floor((Date.now() - firstMs) / 60000) : 0;
-                      const eSec = firstMs ? Math.floor((Date.now() - firstMs) / 1000) % 60 : 0;
-                      const timerCol = eMin >= 30 ? S.danger : eMin >= 15 ? S.warning : S.muted;
+                      const elapsedSec = firstMs ? Math.floor((Date.now() - firstMs) / 1000) : 0;
+                      const eHrs = Math.floor(elapsedSec / 3600);
+                      const eMin = Math.floor(elapsedSec / 60);
+                      const eMinDisp = Math.floor((elapsedSec % 3600) / 60);
+                      const eSec = elapsedSec % 60;
+                      const timerCol = eMin >= 45 ? S.danger : eMin >= 30 ? S.warning : S.muted;
                       const merged = [];
                       allItems.forEach(item => {
                         const ex = merged.find(m => m.producto_id === item.producto_id);
@@ -1815,7 +1819,7 @@ window.__App = function CantinaFull() {
                                 {extra > 0 && <div style={{ color: S.muted, fontSize: 10 }}>+{extra} {extra === 1 ? "item" : "items"}</div>}
                               </div>
                               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2, paddingTop: 6, borderTop: `1px solid ${S.border}` }}>
-                                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 700, color: timerCol }}>⏱ {eMin}:{String(eSec).padStart(2, "0")}</span>
+                                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 700, color: timerCol }}>⏱ {eHrs > 0 ? `${eHrs}:${String(eMinDisp).padStart(2,"0")}:${String(eSec).padStart(2,"0")}` : `${eMin}:${String(eSec).padStart(2,"0")}`}</span>
                                 <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                                   <span title="Cocina" style={{ fontSize: 8, color: mPeds.every(p => p.estado === 'entregado') ? S.success : mPeds.some(p => p.estado === 'listo') ? S.success : S.warning }}>●</span>
                                   <span title="Pago" style={{ fontSize: 8, color: mPeds.every(p => p.cobrado) ? S.success : S.danger }}>●</span>
@@ -1868,13 +1872,14 @@ window.__App = function CantinaFull() {
                     {(() => {
                       const firstTime = Math.min(...selPeds.map(p => new Date(p.createdAt).getTime()));
                       const elapsed = Math.floor((Date.now() - firstTime) / 1000);
-                      const eMin = Math.floor(elapsed / 60); const eSec = elapsed % 60;
+                      const eHrs = Math.floor(elapsed / 3600);
+                      const eMin = Math.floor(elapsed / 60); const eMinDisp = Math.floor((elapsed % 3600) / 60); const eSec = elapsed % 60;
                       const statusOrder = { pendiente: 0, en_preparacion: 1, listo: 2, entregado: 3 };
                       const latestStatus = selPeds.reduce((w, p) => statusOrder[p.estado] < statusOrder[w] ? p.estado : w, "entregado");
                       return (
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, fontWeight: 800, color: eMin >= 15 ? S.danger : eMin >= 8 ? S.warning : S.muted }}>
-                            ⏱ {eMin}:{String(eSec).padStart(2, "0")}
+                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, fontWeight: 800, color: eMin >= 45 ? S.danger : eMin >= 30 ? S.warning : S.muted }}>
+                            ⏱ {eHrs > 0 ? `${eHrs}:${String(eMinDisp).padStart(2,"0")}:${String(eSec).padStart(2,"0")}` : `${eMin}:${String(eSec).padStart(2,"0")}`}
                           </span>
                           <span style={{ fontSize: 10, fontWeight: 800, padding: "3px 8px", borderRadius: 5, color: "#fff",
                             background: latestStatus === "pendiente" ? S.danger : latestStatus === "en_preparacion" ? S.warning : latestStatus === "listo" ? S.success : S.muted }}>
