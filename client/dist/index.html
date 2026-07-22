@@ -1848,7 +1848,7 @@ window.__App = function CantinaFull() {
                   <span style={{ fontSize: 10, fontWeight: 800, color: S.muted }}>👤</span>
                   <button onClick={() => asignarMozo(sel, null)} title="Sin mozo"
                     style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${!mesasMozos[sel] ? S.accent : S.border}`, background: !mesasMozos[sel] ? S.accent : "transparent", color: !mesasMozos[sel] ? "#fff" : S.muted, fontSize: 11, fontWeight: 800, cursor: "pointer", lineHeight: 1 }}>—</button>
-                  {usuarios.map(u => {
+                  {usuarios.filter(u => u.rol === 'mozo' || u.rol === 'cajero').map(u => {
                     const isAssigned = mesasMozos[sel] === u.id;
                     return (
                       <button key={u.id} onClick={() => asignarMozo(sel, u.id)} title={u.nombre}
@@ -3703,7 +3703,7 @@ window.__App = function CantinaFull() {
             <div style={{ fontSize: 11, fontWeight: 800, color: S.muted, letterSpacing: "0.08em" }}>
               USUARIOS ({usuarios.length})
             </div>
-            <button onClick={() => setUserForm({ mode: "nuevo", nombre: "", rol: "cajero", pin: "" })} style={{
+            <button onClick={() => setUserForm({ mode: "nuevo", nombre: "", rol: "mozo", pin: "" })} style={{
               padding: "10px 20px", borderRadius: 10, border: "none", background: S.accent, color: "#fff",
               fontSize: 13, fontWeight: 800, cursor: "pointer",
             }}>+ Nuevo Usuario</button>
@@ -3727,12 +3727,12 @@ window.__App = function CantinaFull() {
                 <div>
                   <div style={{ fontSize: 10, fontWeight: 700, color: S.muted, marginBottom: 4 }}>Rol</div>
                   <div style={{ display: "flex", gap: 4 }}>
-                    {["admin", "cajero", "cocina"].map(r => (
+                    {["mozo", "cajero"].map(r => (
                       <button key={r} onClick={() => setUserForm(prev => ({ ...prev, rol: r }))} style={{
                         flex: 1, padding: "10px 0", borderRadius: 8, border: `2px solid ${userForm.rol === r ? S.accent : S.border}`,
                         background: userForm.rol === r ? S.accent : S.bg, color: userForm.rol === r ? "#fff" : S.text,
                         fontSize: 11, fontWeight: 800, cursor: "pointer", textTransform: "capitalize",
-                      }}>{r === "admin" ? "🔑 Admin" : r === "cajero" ? "🛒 Cajero" : "👨‍🍳 Cocina"}</button>
+                      }}>{r === "mozo" ? "🧑 Mozo" : "🛒 Cajero"}</button>
                     ))}
                   </div>
                 </div>
@@ -3785,13 +3785,13 @@ window.__App = function CantinaFull() {
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {usuarios.map(u => (
               <div key={u.id} className="anim-in" style={{ display: "flex", alignItems: "center", padding: "14px 16px", borderRadius: 12, background: S.surface, border: `1px solid ${S.border}`, gap: 14 }}>
-                <div style={{ width: 44, height: 44, borderRadius: 12, background: u.rol === "admin" ? S.accent + "20" : u.rol === "cajero" ? S.success + "20" : S.warning + "20", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
-                  {u.rol === "admin" ? "🔑" : u.rol === "cajero" ? "🛒" : "👨‍🍳"}
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: u.rol === "admin" ? S.accent + "20" : u.rol === "cajero" ? S.success + "20" : S.info + "20", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
+                  {u.rol === "admin" ? "🔑" : u.rol === "cajero" ? "🛒" : "🧑"}
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: 15, color: S.text }}>{u.nombre}</div>
                   <div style={{ fontSize: 11, color: S.muted, marginTop: 2 }}>
-                    {u.rol === "admin" ? "Administrador" : u.rol === "cajero" ? "Cajero" : "Cocina"} · PIN: {"●".repeat(4)}
+                    {u.rol === "admin" ? "Administrador" : u.rol === "cajero" ? "Cajero" : "Mozo"} · PIN: {"●".repeat(4)}
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
