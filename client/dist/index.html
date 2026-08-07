@@ -851,12 +851,13 @@ window.__App = function CantinaFull() {
   };
 
   // Cobrar pedido
-  const cobrarPedido = async (pedidoId, metodo, montoRecibido, referencia, clienteId, descPct) => {
+  const cobrarPedido = async (pedidoId, metodo, montoRecibido, referencia, clienteId, descPct, imprimir) => {
     const pedOriginal = pedidos.find(p => p.id === pedidoId);
     const body = { metodo_pago: metodo };
     if (referencia) body.referencia = referencia;
     if (clienteId) body.cliente_id = clienteId;
     if (descPct) body.descuento_pct = Number(descPct);
+    if (imprimir !== undefined) body.imprimir = imprimir;
 
     if (pedOriginal?.tipo === "mesa" && pedOriginal.mesa_numero) {
       // Mesa: endpoint consolidado → un solo ticket para todos los pedidos
@@ -868,9 +869,10 @@ window.__App = function CantinaFull() {
       setCajaMovimientos(prev => [...prev, { tipo: "venta", metodo, monto: totalCobrado, pedido_num: pedOriginal.numero || 0, referencia: referencia || null, cliente_id: clienteId || null, ts: new Date().toISOString() }]);
       if (metodo === "cuenta_corriente" && clienteId) setClientes(prev => prev.map(c => c.id === clienteId ? { ...c, saldo: c.saldo + totalCobrado } : c));
       setCobrandoPedido(null);
-      setTicketVisible(pedOriginal);
+      const allItems = result.pedidos.flatMap(p => p.items);
+      setTicketVisible({ ...pedOriginal, metodo_pago: metodo, total: totalCobrado, items: allItems });
       playCajaCobroSound();
-      setTimeout(() => setTicketVisible(null), 1000);
+      setTimeout(() => setTicketVisible(null), 1500);
       showMsg("💰 Cobrado $" + totalCobrado.toLocaleString() + " con " + (metodo === "efectivo" ? "efectivo" : metodo === "transferencia" ? "transferencia" : "fiado"));
       return;
     }
@@ -879,13 +881,13 @@ window.__App = function CantinaFull() {
     const result = await apiFetch(`/pedidos/${pedidoId}/cobrar`, { method: 'POST', body });
     if (!result) { showMsg("❌ Error al cobrar"); return; }
     setPedidos(prev => prev.map(p => p.id === pedidoId ? { ...p, cobrado: true, metodo_pago: metodo, estado: 'entregado', cliente_id: clienteId } : p));
-    const totalCobrado = pedOriginal?.total || 0;
+    const totalCobrado = result.total ?? pedOriginal?.total ?? 0;
     setCajaMovimientos(prev => [...prev, { tipo: "venta", metodo, monto: totalCobrado, pedido_num: pedOriginal?.numero || 0, referencia: referencia || null, cliente_id: clienteId || null, ts: new Date().toISOString() }]);
     if (metodo === "cuenta_corriente" && clienteId) setClientes(prev => prev.map(c => c.id === clienteId ? { ...c, saldo: c.saldo + totalCobrado } : c));
     setCobrandoPedido(null);
-    setTicketVisible(pedOriginal);
+    setTicketVisible({ ...pedOriginal, metodo_pago: metodo });
     playCajaCobroSound();
-    setTimeout(() => setTicketVisible(null), 1000);
+    setTimeout(() => setTicketVisible(null), 1500);
     showMsg("💰 Cobrado $" + totalCobrado.toLocaleString() + " con " + (metodo === "efectivo" ? "efectivo" : metodo === "transferencia" ? "transferencia" : "fiado"));
   };
 
@@ -1084,7 +1086,7 @@ window.__App = function CantinaFull() {
         </div>
       ) : theme === 'tablet' ? (() => {
         const pedidosSinEntregar = pedidos.filter(p => p.estado === "listo" && !p.solo_despacho).length;
-        const pedidosSinCobrar = pedidos.filter(p => !p.cobrado && !p.solo_despacho && p.estado !== 'cancelado').length;
+        const pedidosSinCobrar = pedidos.filter(p => !p.cobrado && p.estado !== 'cancelado').length;
         const pedidosCocina = pedidos.filter(p => ["pendiente", "en_preparacion"].includes(p.estado) && !p.solo_despacho).length;
         const mesasConPago = Array.from({ length: MESAS_TOTAL }, (_, i) => i + 1).some(n => pedidosMesa(n).some(p => !p.cobrado && p.estado === "entregado"));
         return (
@@ -1166,7 +1168,7 @@ window.__App = function CantinaFull() {
               ["dashboard", "📊 Sistema"],
             ].map(([key, label]) => {
               const pedidosSinEntregar = pedidos.filter(p => p.estado === "listo" && !p.solo_despacho).length;
-              const pedidosSinCobrar = pedidos.filter(p => !p.cobrado && !p.solo_despacho && p.estado !== 'cancelado').length;
+              const pedidosSinCobrar = pedidos.filter(p => !p.cobrado && p.estado !== 'cancelado').length;
               const pedidosCocina = pedidos.filter(p => ["pendiente", "en_preparacion"].includes(p.estado) && !p.solo_despacho).length;
               return (
               <button key={key} onClick={() => setTab(key)} style={{ padding: "8px 14px", borderRadius: 10, border: "none", fontSize: 12, fontWeight: 800, background: tab === key ? S.accent : "transparent", color: tab === key ? "#fff" : S.muted, cursor: "pointer", transition: "all 0.15s", position: "relative" }}>
@@ -2813,13 +2815,13 @@ window.__App = function CantinaFull() {
               </div>
 
               {/* Cobros pendientes */}
-              {pedidos.filter(p => !p.cobrado && !p.solo_despacho && p.estado !== 'cancelado').length > 0 && (
+              {pedidos.filter(p => !p.cobrado && p.estado !== 'cancelado').length > 0 && (
                 <div style={{ marginBottom: 24 }}>
                   <div style={{ fontSize: 11, fontWeight: 800, color: S.danger, letterSpacing: "0.08em", marginBottom: 12 }}>
-                    ⚠️ COBROS PENDIENTES ({pedidos.filter(p => !p.cobrado && !p.solo_despacho && p.estado !== 'cancelado').length})
+                    ⚠️ COBROS PENDIENTES ({pedidos.filter(p => !p.cobrado && p.estado !== 'cancelado').length})
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
-                    {pedidos.filter(p => !p.cobrado && !p.solo_despacho && p.estado !== 'cancelado').map(p => (
+                    {pedidos.filter(p => !p.cobrado && p.estado !== 'cancelado').map(p => (
                       <div key={p.id} className="pulse-border" style={{ padding: 14, borderRadius: 12, background: S.surface, border: `2px solid ${S.danger}40` }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <div>
@@ -4181,7 +4183,7 @@ window.__App = function CantinaFull() {
       {/* ========================================= */}
       {theme === 'modern' && (() => {
         const pedidosSinEntregar = pedidos.filter(p => p.estado === "listo" && !p.solo_despacho).length;
-        const pedidosSinCobrar = pedidos.filter(p => !p.cobrado && !p.solo_despacho && p.estado !== 'cancelado').length;
+        const pedidosSinCobrar = pedidos.filter(p => !p.cobrado && p.estado !== 'cancelado').length;
         const pedidosCocina = pedidos.filter(p => ["pendiente", "en_preparacion"].includes(p.estado) && !p.solo_despacho).length;
         const mesasConPago = Array.from({ length: MESAS_TOTAL }, (_, i) => i + 1).some(n => pedidosMesa(n).some(p => !p.cobrado && p.estado === "entregado"));
         const bottomNavItems = [
@@ -4460,6 +4462,7 @@ function CobrarModal({ pedido, onCobrar, onClose, clientes, usuarios, mesasMozos
   const [clienteSelec, setClienteSelec] = useState(null);
   const [showClienteList, setShowClienteList] = useState(false);
   const [descPct, setDescPct] = useState("");
+  const [imprimirTicket, setImprimirTicket] = useState(false);
   const montoInputRef = useRef(null);
 
   const descMonto = descPct ? Math.round(pedido.total * Number(descPct) / 100) : 0;
@@ -4476,7 +4479,7 @@ function CobrarModal({ pedido, onCobrar, onClose, clientes, usuarios, mesasMozos
   useEffect(() => {
     const confirmar = async () => {
       if (!puedeConfirmar()) return;
-      try { await onCobrar(pedido.id, metodo, Number(montoRecibido), referencia, clienteSelec?.id || null, descPct || null); } catch(e) {}
+      try { await onCobrar(pedido.id, metodo, Number(montoRecibido), referencia, clienteSelec?.id || null, descPct || null, imprimirTicket); } catch(e) {}
     };
     const h = (e) => {
       if (e.key === 'Escape') { e.preventDefault(); onClose(); }
@@ -4663,7 +4666,7 @@ function CobrarModal({ pedido, onCobrar, onClose, clientes, usuarios, mesasMozos
                   value={montoRecibido}
                   onChange={e => setMontoRecibido(e.target.value.replace(/\D/g, ''))}
                   onKeyDown={e => {
-                    if (e.key === 'Enter') { e.preventDefault(); if (puedeConfirmar()) onCobrar(pedido.id, metodo, Number(montoRecibido), referencia, clienteSelec?.id || null, descPct || null).catch(()=>{}); }
+                    if (e.key === 'Enter') { e.preventDefault(); if (puedeConfirmar()) onCobrar(pedido.id, metodo, Number(montoRecibido), referencia, clienteSelec?.id || null, descPct || null, imprimirTicket).catch(()=>{}); }
                   }}
                   placeholder="0"
                   style={{ width: "100%", padding: "8px 10px", borderRadius: 10, border: `2px solid ${montoRecibido ? S.accent : S.border}`, background: S.bg, fontSize: 28, fontWeight: 900, textAlign: "center", color: montoRecibido ? S.text : S.muted, outline: "none", fontFamily: "'JetBrains Mono', monospace" }}
@@ -4715,7 +4718,7 @@ function CobrarModal({ pedido, onCobrar, onClose, clientes, usuarios, mesasMozos
                 maxLength={4}
                 value={referencia}
                 onChange={e => setReferencia(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (puedeConfirmar()) onCobrar(pedido.id, metodo, Number(montoRecibido), referencia, clienteSelec?.id || null, descPct || null).catch(()=>{}); } }}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (puedeConfirmar()) onCobrar(pedido.id, metodo, Number(montoRecibido), referencia, clienteSelec?.id || null, descPct || null, imprimirTicket).catch(()=>{}); } }}
                 placeholder="_ _ _ _"
                 style={{ flex: 1, padding: "10px 14px", borderRadius: 10, border: `2px solid ${referencia ? S.accent : S.border}`, background: S.bg, fontSize: 22, fontWeight: 800, color: S.text, textAlign: "center", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.2em", outline: "none" }}
               />
@@ -4734,11 +4737,11 @@ function CobrarModal({ pedido, onCobrar, onClose, clientes, usuarios, mesasMozos
             {clienteSelec ? (
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: S.warning }}>
-                  ⚠️ Se carga ${pedido.total.toLocaleString()} a la cuenta de {clienteSelec.nombre} {clienteSelec.apellido}
+                  ⚠️ Se carga ${totalFinal.toLocaleString()} a la cuenta de {clienteSelec.nombre} {clienteSelec.apellido}
                 </div>
                 {clienteSelec.saldo > 0 && (
                   <div style={{ fontSize: 12, color: S.danger, marginTop: 6, fontWeight: 700 }}>
-                    Deuda actual: ${clienteSelec.saldo.toLocaleString()} → Nueva deuda: ${(clienteSelec.saldo + pedido.total).toLocaleString()}
+                    Deuda actual: ${clienteSelec.saldo.toLocaleString()} → Nueva deuda: ${(clienteSelec.saldo + totalFinal).toLocaleString()}
                   </div>
                 )}
               </div>
@@ -4750,9 +4753,18 @@ function CobrarModal({ pedido, onCobrar, onClose, clientes, usuarios, mesasMozos
           </div>
         )}
 
+        {pedido.tipo !== "mesa" && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", borderRadius: 10, background: S.bg, border: `1px solid ${imprimirTicket ? S.accent : S.border}`, marginBottom: 12, cursor: "pointer" }}
+            onClick={() => setImprimirTicket(v => !v)}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: imprimirTicket ? S.text : S.muted }}>🖨️ Imprimir ticket</span>
+            <div style={{ width: 36, height: 20, borderRadius: 10, background: imprimirTicket ? S.accent : S.border, position: "relative", transition: "background 0.2s" }}>
+              <div style={{ position: "absolute", top: 2, left: imprimirTicket ? 18 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s" }} />
+            </div>
+          </div>
+        )}
         <div style={{ display: "flex", gap: 12 }}>
           <button onClick={onClose} style={{ flex: 1, padding: "12px 0", borderRadius: 12, border: `1px solid ${S.border}`, background: "transparent", color: S.muted, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Cancelar</button>
-          <button onClick={async () => { if (puedeConfirmar()) { try { await onCobrar(pedido.id, metodo, Number(montoRecibido), referencia, clienteSelec?.id || null, descPct || null); } catch(e) { console.error('Cobro error:', e); } } }} disabled={!puedeConfirmar()}
+          <button onClick={async () => { if (puedeConfirmar()) { try { await onCobrar(pedido.id, metodo, Number(montoRecibido), referencia, clienteSelec?.id || null, descPct || null, imprimirTicket); } catch(e) { console.error('Cobro error:', e); } } }} disabled={!puedeConfirmar()}
             style={{ flex: 1, padding: "12px 0", borderRadius: 12, border: "none", background: puedeConfirmar() ? S.success : S.border, color: puedeConfirmar() ? "#000" : S.muted, fontSize: 13, fontWeight: 800, cursor: puedeConfirmar() ? "pointer" : "not-allowed" }}>
             ✅ Confirmar Cobro
           </button>

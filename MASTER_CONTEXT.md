@@ -7,9 +7,9 @@ Incluye: impresora térmica para tickets, TV en el salón con carrusel de imáge
 
 ---
 
-## Estado actual del sistema (julio 2026)
+## Estado actual del sistema (agosto 2026)
 
-El sistema está **auditado, corregido y listo para entrega al cliente**. Todos los servicios levantan solos tras un reboot. Se realizó una auditoría completa de código pre-entrega con 9 bugs críticos/altos corregidos.
+El sistema está **auditado, corregido y listo para entrega al cliente**. Todos los servicios levantan solos tras un reboot. Se realizaron dos rondas de auditoría: 9 bugs corregidos en julio 2026 y 3 bugs adicionales de manejo de dinero corregidos en agosto 2026.
 
 ### Completado
 
@@ -22,9 +22,12 @@ El sistema está **auditado, corregido y listo para entrega al cliente**. Todos 
 - TV promo carousel: `promo.html` fullscreen + API completa (upload/delete imágenes)
 - Backups con retención de 30 días; scripts de mantenimiento completos
 - Documentación completa: ARCHITECTURE, DEPLOYMENT, RECOVERY, OPERACION, SERVER_INFO, MASTER_CONTEXT
-- **Impresora térmica ESC/POS** integrada (`printer.js`): auto-imprime al cobrar, ticket rediseñado (CANTINA NyG, 42 chars, timezone AR)
+- **Impresora térmica ESC/POS** integrada (`printer.js`): auto-imprime al cobrar mesas; en pedidos de barra la impresión es opcional (toggle en modal de cobro, default apagado)
+- **Ticket post-cobro en pantalla:** muestra datos reales de la venta (ítems, total, método de pago) y se cierra solo a los 1.5s
 - **Pantalla Caja con 3 solapas:** Hoy · Historial (últimos 30 cierres con Ver/Descargar) · Estadísticas (gráfico torta, rankings, métricas, selector de rango)
-- **Auditoría pre-entrega:** 9 bugs críticos/altos corregidos — ver `PROJECT_TODO.md` para detalle completo
+- **Despacho directo en barra:** pedidos con todos los ítems de categoría `despacho_directo` no aparecen en cocina.html pero sí en cobros. Campo `solo_despacho` computado en el servidor (no en DB) por `enrichPedido()`.
+- **Auditoría pre-entrega (jul 2026):** 9 bugs críticos/altos corregidos — ver `PROJECT_TODO.md` para detalle completo
+- **Auditoría de dinero (ago 2026):** 3 bugs de cobro/caja corregidos — `totalCobrado` en cajaMovimientos, aviso cuenta corriente con descuento, timezone en `por-fecha`
 
 ### Robustez del backend (post-auditoría)
 

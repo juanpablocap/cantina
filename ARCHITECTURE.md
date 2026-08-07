@@ -119,7 +119,7 @@ Un solo archivo Node.js con Express. Usa Prisma como ORM sobre PostgreSQL.
 | GET    | /api/pedidos/por-fecha         | Pedidos cobrados de una fecha (`?fecha=YYYY-MM-DD`)  |
 | POST   | /api/pedidos                   | Crea pedido, valida cantidad > 0, descuenta stock    |
 | PUT    | /api/pedidos/:id               | Actualiza pedido, emite WS                           |
-| POST   | /api/pedidos/:id/cobrar        | Marca cobrado, aplica descuento real al total, gestiona cuenta corriente |
+| POST   | /api/pedidos/:id/cobrar        | Marca cobrado, aplica descuento real al total, gestiona cuenta corriente. Acepta `imprimir: bool` — solo imprime si `true` (para barra; mesas siempre imprimen) |
 | POST   | /api/pedidos/:id/cancelar      | Cancela y restaura stock, emite WS                   |
 | GET    | /api/pedidos/:id/ticket        | Genera texto de ticket para impresora                |
 
@@ -150,7 +150,7 @@ Un solo archivo Node.js con Express. Usa Prisma como ORM sobre PostgreSQL.
 ### WebSocket (Socket.io)
 
 Eventos emitidos por el servidor:
-- `nuevo-pedido` — cuando se crea un pedido
+- `nuevo-pedido` — cuando se crea un pedido (payload enriquecido con `solo_despacho` y `despacho_directo` por ítem)
 - `pedido-actualizado` — cuando se modifica, cobra o cancela un pedido
 - `notif-autoservicio` — cuando llega un pedido desde autoservicio
 
@@ -166,8 +166,8 @@ Manejado con Prisma. Schema en `prisma/schema.prisma`.
 
 ```
 Usuario         → login por PIN, roles (caja, cocina, admin)
-Categoria       → agrupa productos, puede tener despacho_directo
-Producto        → precio, stock, stock_min, código de barras opcional
+Categoria       → agrupa productos, flag despacho_directo (ítems de esta cat no pasan por cocina)
+Producto        → precio, stock, stock_min, código de barras opcional, flag cocina (override despacho_directo)
 Cliente         → nombre, apodo, división, saldo cuenta corriente
 ClientePago     → historial de pagos de clientes
 Pedido          → tipo (mesa/barra), estado, cobrado, método de pago, descuento_pct, total (post-descuento)
@@ -175,6 +175,8 @@ PedidoItem      → líneas del pedido con precio capturado al momento
 CierreCaja      → resumen de cierre con efectivo/transferencia/fiado + details JSON (productos vendidos)
 CarouselImage   → imágenes para el carrusel de la pantalla de TV
 ```
+
+> **Campos computados (no en DB):** `Pedido.solo_despacho` y `PedidoItem.despacho_directo` se calculan en runtime por `enrichPedido()` (server.js) a partir de `Categoria.despacho_directo` y `Producto.cocina`. `GET /api/pedidos` y el emit de `POST /api/pedidos` siempre pasan por este helper.
 
 **Estados de un pedido:** `pendiente` → `listo` → `entregado` / `cancelado`
 

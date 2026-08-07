@@ -62,7 +62,7 @@ window.__App = function CocinaDisplay() {
     const peds = await apiFetch('/pedidos');
     setConectado(!!peds);
     if (peds) {
-      const activos = peds.filter(p => ["pendiente", "en_preparacion", "listo"].includes(p.estado));
+      const activos = peds.filter(p => ["pendiente", "en_preparacion", "listo"].includes(p.estado) && !p.solo_despacho);
       const prev = prevPedidosRef.current;
       if (prev.length > 0) {
         const nuevosModificados = {};

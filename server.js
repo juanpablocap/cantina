@@ -33,6 +33,17 @@ app.use('/images', express.static(path.join(__dirname, 'images')));
 // ============================================
 const printer = require('./printer');
 
+// Agrega solo_despacho (computado) y despacho_directo por item a un pedido
+const ITEMS_WITH_CAT = { include: { producto: { include: { categoria: true } } } };
+const enrichPedido = (p) => ({
+  ...p,
+  solo_despacho: p.items.length > 0 && p.items.every(i => i.producto?.categoria?.despacho_directo && !i.producto?.cocina),
+  items: p.items.map(i => ({
+    ...i,
+    despacho_directo: !!(i.producto?.categoria?.despacho_directo && !i.producto?.cocina),
+  })),
+});
+
 // ============================================
 // HEALTH & SYSTEM
 // ============================================
@@ -406,10 +417,10 @@ app.get('/api/pedidos', async (req, res) => {
     const today = midnightAR();
     const pedidos = await prisma.pedido.findMany({
       where: { createdAt: { gte: today } },
-      include: { items: { include: { producto: true } }, cliente: true },
+      include: { items: ITEMS_WITH_CAT, cliente: true },
       orderBy: { createdAt: 'desc' }
     });
-    res.json(pedidos);
+    res.json(pedidos.map(enrichPedido));
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -429,10 +440,9 @@ app.get('/api/pedidos/por-fecha', async (req, res) => {
   try {
     const { fecha } = req.query; // YYYY-MM-DD
     if (!fecha) return res.status(400).json({ error: 'fecha requerida' });
-    const desde = new Date(fecha);
-    desde.setHours(0, 0, 0, 0);
-    const hasta = new Date(fecha);
-    hasta.setHours(23, 59, 59, 999);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return res.status(400).json({ error: 'formato de fecha inválido (YYYY-MM-DD)' });
+    const desde = new Date(fecha + 'T00:00:00-03:00');
+    const hasta = new Date(fecha + 'T23:59:59.999-03:00');
     const pedidos = await prisma.pedido.findMany({
       where: { cobrado: true, estado: { not: 'cancelado' }, createdAt: { gte: desde, lte: hasta } },
       include: { items: { include: { producto: true } }, cliente: true },
@@ -470,7 +480,7 @@ app.post('/api/pedidos', async (req, res) => {
             }))
           }
         },
-        include: { items: { include: { producto: true } } }
+        include: { items: ITEMS_WITH_CAT }
       });
       for (const item of items) {
         await tx.producto.update({ where: { id: item.producto_id }, data: { stock: { decrement: item.cantidad } } });
@@ -478,8 +488,9 @@ app.post('/api/pedidos', async (req, res) => {
       return pedido;
     });
 
-    io.emit('nuevo-pedido', pedido);
-    res.json(pedido);
+    const pedidoEnriquecido = enrichPedido(pedido);
+    io.emit('nuevo-pedido', pedidoEnriquecido);
+    res.json(pedidoEnriquecido);
   } catch(e) {
     console.error('Error creando pedido:', e);
     res.status(500).json({ error: e.message });
@@ -558,7 +569,7 @@ app.put('/api/pedidos/:id/items', async (req, res) => {
 });
 
 app.post('/api/pedidos/:id/cobrar', async (req, res) => {
-  const { metodo_pago, referencia, descuento_pct, cliente_id } = req.body;
+  const { metodo_pago, referencia, descuento_pct, cliente_id, imprimir } = req.body;
   const metodosValidos = ['efectivo', 'transferencia', 'cuenta_corriente'];
   if (!metodosValidos.includes(metodo_pago)) return res.status(400).json({ error: 'metodo_pago inválido' });
 
@@ -602,7 +613,7 @@ app.post('/api/pedidos/:id/cobrar', async (req, res) => {
           mozo_nombre = u?.nombre || null;
         } catch {}
       }
-      printer.printTicket({ ...pedido, _mozo_nombre: mozo_nombre }).catch(err => console.error('[printer] cobro fail:', err.message));
+      if (imprimir) printer.printTicket({ ...pedido, _mozo_nombre: mozo_nombre }).catch(err => console.error('[printer] cobro fail:', err.message));
     })();
     res.json(pedido);
   } catch(e) {
