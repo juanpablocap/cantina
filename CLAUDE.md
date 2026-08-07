@@ -74,6 +74,8 @@ No tocar estas áreas sin leer el contexto completo — bugs sutiles que costó 
 - **`CobrarModal` — aviso cuenta corriente con descuento**: mostraba `pedido.total` (pre-descuento) en el mensaje "Se carga $X a la cuenta". Corregido a `totalFinal`. El operador veía el monto incorrecto antes de confirmar el cobro.
 - **`GET /api/pedidos/por-fecha` — timezone**: usaba `setHours(0,0,0,0)` en UTC del servidor para el rango de fechas. Corregido a `new Date(fecha + 'T00:00:00-03:00')`. Afectaba la reconstrucción de cierres históricos (rango corrido 3 horas).
 
+Los 3 bugs fueron verificados con 15 tests de integración contra el servidor real (agosto 2026). Flujos cubiertos: efectivo/transferencia/cuenta corriente con y sin descuento, mesa completa, cancelación con restauración de stock, guard atómico de doble cobro, pago de deuda, validaciones de rechazo (409/400), timezone de `por-fecha`, descuentos 5%/15%/20%. Todos PASS.
+
 ## Filosofía
 
 Priorizar: estabilidad · simplicidad · recovery rápido · offline/LAN · mantenibilidad.
