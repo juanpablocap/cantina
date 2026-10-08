@@ -3,10 +3,10 @@
 # Uso: bash scripts/monitor.sh
 # Refresca cada 5 segundos. Ctrl+C para salir.
 
-ROUTER="192.168.100.101"
+ROUTER="192.168.1.1"
 ROUTER_USER="root"
 ROUTER_PASS="adminHW"
-SERVER="192.168.100.54"
+SERVER="192.168.1.54"
 API="http://localhost:3001/api"
 INTERVALO=5
 

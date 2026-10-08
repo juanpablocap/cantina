@@ -168,6 +168,85 @@ El `RESTORE.md` tiene los pasos exactos para reinstalar todo desde cero.
 
 ---
 
+## 10. Cambio de router / reubicación del servidor
+
+### Reubicación octubre 2026 — completada
+
+El servidor fue reubicado físicamente en octubre 2026. La red cambió de `192.168.100.x` a `192.168.1.x`.
+
+| | Antes | Ahora |
+|---|---|---|
+| IP servidor | `192.168.100.54` | `192.168.1.54` (estática) |
+| Router | `192.168.100.101` | `192.168.1.1` |
+
+---
+
+### Situación: servidor conectado a un router nuevo sin saber su rango IP
+
+**El servidor ya está configurado en DHCP** (`/etc/netplan/00-installer-config.yaml`). Al conectarlo al nuevo router, obtiene IP automáticamente.
+
+#### Ver la IP asignada
+
+```bash
+ip addr show enp0s31f6
+```
+
+Buscar la línea `inet X.X.X.X/24 scope global dynamic`.
+
+#### Después — asignar IP fija
+
+Una vez decidida la IP definitiva, usar el script (hace backup automático del netplan anterior):
+
+```bash
+sudo bash /home/cantina/cantina-pos/scripts/configurar_ip_estatica.sh
+```
+
+O editar manualmente `/etc/netplan/00-installer-config.yaml`:
+
+```yaml
+network:
+  version: 2
+  ethernets:
+    enp0s31f6:
+      addresses: [192.168.X.Y/24]
+      routes:
+        - to: default
+          via: 192.168.X.1
+      nameservers:
+        addresses: [8.8.8.8, 8.8.4.4]
+```
+
+Aplicar:
+
+```bash
+sudo netplan apply
+```
+
+> ⚠️ Si estás conectado por SSH, la sesión se va a cortar al aplicar. Reconectate con `ssh cantina@<nueva-ip>`.
+
+#### Después de confirmar la IP fija — checklist completo
+
+Actualizar la IP en **todos** los archivos del proyecto que la referencian (buscar con `grep -rn "192\.168\." . --include="*.md" --include="*.sh"`):
+
+| Archivo | Qué cambiar |
+|---|---|
+| `CLAUDE.md` | línea `**Server:**` |
+| `SERVER_INFO.md` | tabla IP local y acceso SSH |
+| `MASTER_CONTEXT.md` | todas las URLs y línea `**Servidor:**` |
+| `ARCHITECTURE.md` | sección Netdata |
+| `OPERACION.md` | tabla de URLs de pantallas (×2) |
+| `PROJECT_TODO.md` | item de Netdata |
+| `scripts/monitor.sh` | variables `ROUTER=` y `SERVER=` |
+| `guia-visual/generar_pdf.js` | comando scp de ejemplo |
+
+Ejemplo para hacer el reemplazo en masa (ajustar IPs):
+```bash
+grep -rn "192\.168\.100\.54" . --include="*.md" --include="*.sh" --include="*.js" | grep -v node_modules
+sed -i 's/192\.168\.100\.54/192.168.X.Y/g' CLAUDE.md SERVER_INFO.md MASTER_CONTEXT.md ARCHITECTURE.md OPERACION.md PROJECT_TODO.md scripts/monitor.sh guia-visual/generar_pdf.js
+```
+
+---
+
 ## Contactos de soporte técnico
 
 > Completar con datos del técnico responsable.

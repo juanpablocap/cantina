@@ -329,5 +329,5 @@ ${seccionesHTML}
   const size = (fs.statSync(OUT_PDF).size / 1024 / 1024).toFixed(1);
   console.log(`  ✓ PDF generado: guia_cantina_pos.pdf (${size} MB)`);
   console.log('\nPara descargar desde tu PC:');
-  console.log('  scp cantina@192.168.100.54:/home/cantina/cantina-pos/guia-visual/guia_cantina_pos.pdf .');
+  console.log('  scp cantina@192.168.1.54:/home/cantina/cantina-pos/guia-visual/guia_cantina_pos.pdf .');
 })().catch(e => { console.error('Error:', e.message); process.exit(1); });

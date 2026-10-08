@@ -189,7 +189,7 @@ Auditoría completa del código real ejecutada antes de la entrega al cliente. S
 * [x] Crear dashboard SSH/TUI interactivo con acciones rápidas — scripts/dashboard.sh
 * [x] Agregar acciones restart rápidas desde dashboard
 * [x] Agregar visualización rápida logs desde dashboard
-* [x] Instalar Netdata v2.10.3 — dashboard profesional en http://192.168.100.54/monitor/
+* [x] Instalar Netdata v2.10.3 — dashboard profesional en http://192.168.1.54/monitor/
 * [x] Sparklines Chart.js en POS — CPU%, RAM%, disco%, red RX/TX con historial 10 min
 * [x] API historial métricas — GET /api/system/history (buffer circular 120 registros)
 * [x] Métricas de red en tiempo real — RX/TX KB/s vía /proc/net/dev

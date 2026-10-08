@@ -17,7 +17,7 @@ El sistema está **auditado, corregido y listo para entrega al cliente**. Todos 
 - Frontend React (Babel in-browser) con Modern POS v2 — bottom navigation, rediseño estructural completo
 - Sistema de doble tema: `modern` (default, indigo) y `classic` (terracota), switchable via toggle 🌙, persistido en localStorage
 - Autorestart de todos los servicios: postgresql → cantina-api → nginx → netdata
-- Monitoreo profesional: **Netdata v2.10.3** en `http://192.168.100.54/monitor/`
+- Monitoreo profesional: **Netdata v2.10.3** en `http://192.168.1.54/monitor/`
 - Sparklines Chart.js en la pestaña Sistema (CPU, RAM, disco, red RX/TX, últimos 10 min)
 - TV promo carousel: `promo.html` fullscreen + API completa (upload/delete imágenes)
 - Backups con retención de 30 días; scripts de mantenimiento completos
@@ -68,13 +68,13 @@ El sistema está **auditado, corregido y listo para entrega al cliente**. Todos 
 
 | Pantalla | URL | Dispositivo |
 |---|---|---|
-| POS principal | `http://192.168.100.54/` | PC caja / tablet admin |
-| Cocina | `http://192.168.100.54/cocina.html` | Pantalla cocina |
-| Autoservicio | `http://192.168.100.54/autoservicio.html` | Tablet clientes |
-| TV Promociones | `http://192.168.100.54/promo.html` | TV del salón |
-| Monitor Netdata | `http://192.168.100.54/monitor/` | Técnico / admin |
+| POS principal | `http://192.168.1.54/` | PC caja / tablet admin |
+| Cocina | `http://192.168.1.54/cocina.html` | Pantalla cocina |
+| Autoservicio | `http://192.168.1.54/autoservicio.html` | Tablet clientes |
+| TV Promociones | `http://192.168.1.54/promo.html` | TV del salón |
+| Monitor Netdata | `http://192.168.1.54/monitor/` | Técnico / admin |
 
-**Servidor:** `ssh cantina@192.168.100.54` — IP fija en la LAN.
+**Servidor:** `ssh cantina@192.168.1.54` — IP fija en la LAN.
 
 ---
 
@@ -153,7 +153,7 @@ CarouselImage  → imágenes para el TV (filename, orden, activo)
 ## Monitoreo
 
 **Netdata v2.10.3** — dashboard profesional instalado y corriendo.
-- URL: `http://192.168.100.54/monitor/` (proxy nginx → `localhost:19999`)
+- URL: `http://192.168.1.54/monitor/` (proxy nginx → `localhost:19999`)
 - Bind: solo a loopback, acceso únicamente vía nginx
 - 200+ métricas auto-descubiertas, resolución 1s, historial de horas/días
 - Reinstalación: `sudo bash scripts/setup_netdata.sh`

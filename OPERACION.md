@@ -6,7 +6,7 @@ Guía para el personal que opera el sistema día a día.
 
 ## Acceso al sistema
 
-Abrir en el navegador: **http://192.168.100.54/**
+Abrir en el navegador: **http://192.168.1.54/**
 
 Al entrar pide un PIN de 4 dígitos según el rol del usuario.
 
@@ -16,10 +16,10 @@ Al entrar pide un PIN de 4 dígitos según el rol del usuario.
 
 | Pantalla | URL | Quién la usa |
 |---|---|---|
-| POS principal | `http://192.168.100.54/` | Cajero, admin, cocina |
-| Cocina | `http://192.168.100.54/cocina.html` | Cocineros |
-| Autoservicio | `http://192.168.100.54/autoservicio.html` | Clientes (tablet) |
-| TV Promociones | `http://192.168.100.54/promo.html` | TV del salón |
+| POS principal | `http://192.168.1.54/` | Cajero, admin, cocina |
+| Cocina | `http://192.168.1.54/cocina.html` | Cocineros |
+| Autoservicio | `http://192.168.1.54/autoservicio.html` | Clientes (tablet) |
+| TV Promociones | `http://192.168.1.54/promo.html` | TV del salón |
 
 ---
 
@@ -155,7 +155,7 @@ La pantalla del TV muestra imágenes de promociones en carrusel automático.
 
 ### El TV
 
-- El TV debe tener abierta la página `http://192.168.100.54/promo.html`
+- El TV debe tener abierta la página `http://192.168.1.54/promo.html`
 - Las imágenes rotan automáticamente cada 8 segundos
 - Si se agregan o eliminan imágenes, el TV se actualiza en menos de 30 segundos
 

@@ -246,7 +246,7 @@ Proxy inverso en puerto 80 → Node.js en 3001.
 
 ## Monitoreo — Netdata
 
-Instalado en el servidor. Dashboard profesional accesible en `http://192.168.100.54/monitor/`.
+Instalado en el servidor. Dashboard profesional accesible en `http://192.168.1.54/monitor/`.
 
 - **Versión:** v2.10.3
 - **Puerto interno:** `127.0.0.1:19999` (bind a loopback, solo accesible vía nginx)

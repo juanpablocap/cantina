@@ -4,11 +4,11 @@
 
 | | |
 |---|---|
-| **IP local** | 192.168.100.54 |
+| **IP local** | `192.168.1.54` |
 | **Hostname** | cantina-server |
 | **OS** | Ubuntu 26.04 LTS |
 | **Usuario** | cantina |
-| **Acceso SSH** | `ssh cantina@192.168.100.54` |
+| **Acceso SSH** | `ssh cantina@192.168.1.54` |
 
 ## Hardware
 
@@ -77,19 +77,19 @@ Nginx (ver: nginx -v)
 ## URLs del sistema
 
 ```
-App principal:   http://192.168.100.54/
-Cocina:          http://192.168.100.54/cocina.html
-Autoservicio:    http://192.168.100.54/autoservicio.html
-TV Promociones:  http://192.168.100.54/promo.html
-Monitor Netdata: http://192.168.100.54/monitor/
-API health:      http://192.168.100.54/api/health
+App principal:   http://192.168.1.54/
+Cocina:          http://192.168.1.54/cocina.html
+Autoservicio:    http://192.168.1.54/autoservicio.html
+TV Promociones:  http://192.168.1.54/promo.html
+Monitor Netdata: http://192.168.1.54/monitor/
+API health:      http://192.168.1.54/api/health
 ```
 
 ## Monitoreo — Netdata
 
 Dashboard profesional de métricas del servidor en tiempo real.
 
-- **URL:** `http://192.168.100.54/monitor/`
+- **URL:** `http://192.168.1.54/monitor/`
 - **También desde el POS:** pestaña Sistema → botón **📊 Monitor**
 - **Instalación:** `sudo bash scripts/setup_netdata.sh` (requiere internet solo la primera vez)
 - **Puerto interno:** 19999 (bind a localhost, acceso solo vía nginx)
@@ -100,10 +100,10 @@ El POS también muestra sparklines inline (CPU, RAM, disco, red RX/TX) con los �
 
 ## TV Promociones (carrusel)
 
-La pantalla del TV debe abrir `http://192.168.100.54/promo.html` en modo pantalla completa.
+La pantalla del TV debe abrir `http://192.168.1.54/promo.html` en modo pantalla completa.
 
 - Las imágenes se gestionan desde la pestaña **Sistema → Imágenes Carrusel** del POS principal
 - Se guardan en `/home/cantina/cantina-pos/images/`
 - La página del TV se actualiza automáticamente cada 30 segundos
 - Cada imagen se muestra durante 8 segundos con transición suave
-- Para configurar el TV: apuntarlo siempre a la IP `192.168.100.54` (IP fija del servidor)
+- Para configurar el TV: apuntarlo siempre a la IP `192.168.1.54` (IP fija del servidor)

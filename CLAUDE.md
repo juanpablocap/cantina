@@ -2,7 +2,7 @@
 
 Sistema POS touchscreen para cantina corporativa argentina. Corre 100% en LAN, sin dependencia de internet en runtime. Un servidor Ubuntu sirve la API y el frontend estático; las tablets acceden por IP local vía Chromium.
 
-**Server:** `192.168.100.54` — `ssh cantina@192.168.100.54`
+**Server:** `192.168.1.54` — `ssh cantina@192.168.1.54`
 
 **GitHub:** `https://github.com/juanpablocap/cantina.git` — el hook post-commit hace push automático tras cada commit.
 
