@@ -238,11 +238,23 @@ Actualizar la IP en **todos** los archivos del proyecto que la referencian (busc
 | `PROJECT_TODO.md` | item de Netdata |
 | `scripts/monitor.sh` | variables `ROUTER=` y `SERVER=` |
 | `guia-visual/generar_pdf.js` | comando scp de ejemplo |
+| `~/Desktop/Cantina POS — Cocina.desktop` | campo `URL=` (acceso directo en escritorio del servidor) |
 
-Ejemplo para hacer el reemplazo en masa (ajustar IPs):
+Además, actualizar **manualmente en cada dispositivo físico**:
+
+| Dispositivo | Qué cambiar |
+|---|---|
+| Pantalla cocina | Marcador/favorito del navegador → `http://<nueva-ip>/cocina.html` |
+| TV Promociones | Marcador/favorito o URL en modo kiosk → `http://<nueva-ip>/promo.html` |
+| Tablets autoservicio | Marcador/favorito → `http://<nueva-ip>/autoservicio.html` |
+
+Ejemplo para hacer el reemplazo en masa en los archivos del proyecto (ajustar IPs):
 ```bash
-grep -rn "192\.168\.100\.54" . --include="*.md" --include="*.sh" --include="*.js" | grep -v node_modules
-sed -i 's/192\.168\.100\.54/192.168.X.Y/g' CLAUDE.md SERVER_INFO.md MASTER_CONTEXT.md ARCHITECTURE.md OPERACION.md PROJECT_TODO.md scripts/monitor.sh guia-visual/generar_pdf.js
+grep -rn "192\.168\.X\.Y_VIEJA" . --include="*.md" --include="*.sh" --include="*.js" | grep -v node_modules
+sed -i 's/192\.168\.X\.Y_VIEJA/192.168.X.Y_NUEVA/g' CLAUDE.md SERVER_INFO.md MASTER_CONTEXT.md ARCHITECTURE.md OPERACION.md PROJECT_TODO.md scripts/monitor.sh guia-visual/generar_pdf.js
+
+# Desktop de cocina (en el servidor):
+sed -i 's/192\.168\.X\.Y_VIEJA/192.168.X.Y_NUEVA/g' ~/Desktop/Cantina\ POS\ —\ Cocina.desktop
 ```
 
 ---

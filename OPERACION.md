@@ -170,6 +170,29 @@ La pantalla del TV muestra imágenes de promociones en carrusel automático.
 
 ---
 
+## Configuración de dispositivos
+
+### Pantalla de cocina (en el servidor)
+
+El escritorio del servidor tiene un acceso directo llamado **"Cantina POS — Cocina"** que abre directamente `cocina.html` en el navegador.
+
+- Archivo: `/home/cantina/Desktop/Cantina POS — Cocina.desktop`
+- URL actual: `http://192.168.1.54/cocina.html`
+
+Si cambia la IP del servidor, editar ese archivo y cambiar el campo `URL=`.
+
+### TV Promociones (kiosk externo)
+
+El TV es un dispositivo independiente (no administrado desde el servidor). Para configurarlo:
+
+1. Abrir el navegador en el TV
+2. Navegar a `http://192.168.1.54/promo.html`
+3. Guardar como marcador de inicio o configurar modo kiosk
+
+Si cambia la IP del servidor, actualizar la URL directamente en el TV.
+
+---
+
 ## Qué hacer si algo falla
 
 Ver [RECOVERY.md](RECOVERY.md) para instrucciones detalladas.

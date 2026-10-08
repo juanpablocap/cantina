@@ -69,6 +69,26 @@ Reemplazá `<ip-del-servidor>` con la IP que configuraste en el Paso 1.
 
 ---
 
+## Paso 3b — Actualizar accesos directos y kiosks
+
+### Acceso directo "Cocina" en el escritorio del servidor
+
+El servidor tiene un `.desktop` que abre cocina.html directamente. Actualizarlo con la nueva IP:
+
+```bash
+sed -i 's|URL=http://.*|URL=http://<ip-del-servidor>/cocina.html|' ~/Desktop/Cantina\ POS\ —\ Cocina.desktop
+```
+
+### TV Promociones (dispositivo externo)
+
+El TV es independiente — hay que actualizarlo físicamente:
+
+1. Ir al TV, abrir el navegador
+2. Navegar a `http://<ip-del-servidor>/promo.html`
+3. Guardar como marcador de inicio o actualizar el modo kiosk
+
+---
+
 ## Paso 4 — Verificar autorestart (servicios al encender)
 
 Todos los servicios están configurados para arrancar solos al encender el servidor. Para verificarlo:
